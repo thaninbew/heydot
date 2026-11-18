@@ -1,0 +1,162 @@
+{
+  "machine": "Apple silicon test Mac",
+  "hardware": "Apple M1 Pro, 32 GiB RAM",
+  "os": "macOS 26.7.2",
+  "base": "7a750c013279659336a5222f63b70d41ccc8171f",
+  "units": {
+    "rss": "bytes (Mach resident_size)",
+    "cpu": "percent of one core (getrusage delta, excluding startup snapshot)",
+    "threads": "Mach task_threads"
+  },
+  "probe_sha256": "a113dd333b339ab76dc441fef2d69b7638d535644c3b87bf61bd2e1aed913a7d",
+  "records": {
+    "before": [
+      "RESOURCE idle-start pid=78515 rss=88195072 threads=13",
+      "RESOURCE idle-30s pid=78515 rss=87949312 threads=7",
+      "RESOURCE idle-60s pid=78515 rss=87949312 threads=7",
+      "RESOURCE idle-90s pid=78515 rss=87900160 threads=7",
+      "RESOURCE idle-120s pid=78515 rss=87916544 threads=7",
+      "RESOURCE idle-150s pid=78515 rss=87900160 threads=7",
+      "RESOURCE idle-180s pid=78515 rss=87867392 threads=7",
+      "RESOURCE idle-210s pid=78515 rss=87834624 threads=7",
+      "RESOURCE idle-240s pid=78515 rss=87867392 threads=7",
+      "RESOURCE idle-270s pid=78515 rss=87818240 threads=7",
+      "RESOURCE idle-300s pid=78515 rss=87834624 threads=7"
+    ],
+    "before-cycles": [
+      "RESOURCE idle-start pid=17352 rss=88260608 threads=16 cpu=12.536204406274267",
+      "RESOURCE calls-10 pid=17352 rss=89817088 threads=16 cpu=8.060780976990412",
+      "RESOURCE calls-20 pid=17352 rss=89948160 threads=16 cpu=7.149710962536853",
+      "RESOURCE calls-30 pid=17352 rss=89980928 threads=15 cpu=7.0074160869880195",
+      "RESOURCE calls-40 pid=17352 rss=90030080 threads=15 cpu=6.803992271972345",
+      "RESOURCE calls-50 pid=17352 rss=90128384 threads=15 cpu=7.063103050232475",
+      "RESOURCE fixture-pressed=50",
+      "RESOURCE popover-100 pid=17352 rss=131514368 threads=15 cpu=65.71900770386434",
+      "RESOURCE wake-events-20 pid=17352 rss=131842048 threads=15 cpu=76.31196037523416",
+      "RESOURCE settled pid=17352 rss=130990080 threads=8 cpu=72.07233783463792"
+    ],
+    "before-popover-only": [
+      "RESOURCE popover-only-start pid=40419 rss=52183040 threads=7 cpu=8287.6",
+      "RESOURCE popover-100 pid=40419 rss=110755840 threads=7 cpu=65.0386816711814",
+      "RESOURCE wake-events-20 pid=40419 rss=110772224 threads=7 cpu=9.6000000000096",
+      "RESOURCE settled pid=40419 rss=110411776 threads=4 cpu=59.3272299548779"
+    ],
+    "after-final": [
+      "RESOURCE idle-start pid=18741 rss=88227840 threads=15 cpu=11.1633503282824",
+      "RESOURCE idle-30s pid=18741 rss=90226688 threads=9 cpu=0.056964594953690974",
+      "RESOURCE idle-60s pid=18741 rss=90095616 threads=7 cpu=0.004574383735769953",
+      "RESOURCE idle-90s pid=18741 rss=90013696 threads=6 cpu=0.020549333968121204",
+      "RESOURCE idle-120s pid=18741 rss=90046464 threads=6 cpu=0.0037730343122130278",
+      "RESOURCE idle-150s pid=18741 rss=89997312 threads=6 cpu=0.005619953690206768",
+      "RESOURCE idle-180s pid=18741 rss=89948160 threads=6 cpu=0.004631425553931951",
+      "RESOURCE idle-210s pid=18741 rss=89948160 threads=6 cpu=0.0013054106914846997",
+      "RESOURCE idle-240s pid=18741 rss=89620480 threads=6 cpu=0.006149950309688487",
+      "RESOURCE idle-270s pid=18741 rss=89604096 threads=6 cpu=0.0038380420994341483",
+      "RESOURCE idle-300s pid=18741 rss=89604096 threads=6 cpu=0.0011991280494251214"
+    ],
+    "after-cycles": [
+      "RESOURCE idle-start pid=49146 rss=88178688 threads=15 cpu=11.721842717645258",
+      "RESOURCE calls-10 pid=49146 rss=97484800 threads=16 cpu=26.686842808318005",
+      "RESOURCE calls-20 pid=49146 rss=97959936 threads=16 cpu=33.511665657527814",
+      "RESOURCE calls-30 pid=49146 rss=98402304 threads=16 cpu=29.402522661515995",
+      "RESOURCE calls-40 pid=49146 rss=98762752 threads=16 cpu=33.32276765387582",
+      "RESOURCE calls-50 pid=49146 rss=99155968 threads=17 cpu=33.04978003931369",
+      "RESOURCE fixture-pressed=50",
+      "RESOURCE popover-100 pid=49146 rss=134856704 threads=13 cpu=59.143541548751976",
+      "RESOURCE wake-events-20 pid=49146 rss=134873088 threads=13 cpu=10.900000000013677",
+      "RESOURCE settled pid=49146 rss=133414912 threads=7 cpu=0.15584708131931574"
+    ]
+  },
+  "notes": [
+    "before and after-final are complete 300-second idle phases; their interrupted cycle data must be excluded",
+    "before-cycles uses corrected synthetic visibility and blocked backend reloads, all 50 presses succeeded",
+    "before-popover-only omits WebKit entirely to isolate the closed SwiftUI popover"
+  ],
+  "top": {
+    "before-top": [
+      "78529  com.apple.WebKit 0.0  28M   5/2",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78515  swiftpm-testing- 0.0  22M   6  ",
+      "78529  com.apple.WebKit 0.0  28M+  4  ",
+      "78515  swiftpm-testing- 0.0  22M   6  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78529  com.apple.WebKit 0.0  28M   4  ",
+      "78515  swiftpm-testing- 0.0  22M   6  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78529  com.apple.WebKit 0.1  28M+  5  ",
+      "78515  swiftpm-testing- 0.0  22M   6  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78529  com.apple.WebKit 0.0  28M-  4  ",
+      "78515  swiftpm-testing- 0.0  21M-  6  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78529  com.apple.WebKit 0.0  28M   4/1",
+      "78515  swiftpm-testing- 0.0  21M-  6  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78529  com.apple.WebKit 0.0  28M   4/1",
+      "78515  swiftpm-testing- 0.0  21M-  6  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78529  com.apple.WebKit 0.0  28M   4  ",
+      "78515  swiftpm-testing- 0.0  21M+  7  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78529  com.apple.WebKit 0.0  28M+  4  ",
+      "78515  swiftpm-testing- 0.0  21M-  7  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78529  com.apple.WebKit 0.0  28M+  4  ",
+      "78515  swiftpm-testing- 0.0  21M   7  ",
+      "78527  com.apple.WebKit 0.0  12M   7  ",
+      "78528  com.apple.WebKit 0.0  4608K 3  ",
+      "78515  swiftpm-testing- 0.5  22M+   11 ",
+      "78529  com.apple.WebKit 0.4  30M+   8  ",
+      "78527  com.apple.WebKit 0.0  12M+   8  ",
+      "78528  com.apple.WebKit 0.0  4640K+ 4  "
+    ],
+    "after-final-top": [
+      "18758  com.apple.WebKit 0.0  29M 6/4",
+      "18756  com.apple.WebKit 0.0  12M 7/1",
+      "18741  swiftpm-testing- 0.0  22M 9/3",
+      "18741  swiftpm-testing- 0.0  21M- 9/4",
+      "18756  com.apple.WebKit 0.0  12M  8  ",
+      "18758  com.apple.WebKit 0.0  28M- 8/6",
+      "18758  com.apple.WebKit 0.0  10M- 9/2",
+      "18741  swiftpm-testing- 0.0  21M- 6  ",
+      "18756  com.apple.WebKit 0.0  12M- 8  ",
+      "18741  swiftpm-testing- 0.0  21M- 5  ",
+      "18756  com.apple.WebKit 0.0  11M- 6  ",
+      "18756  com.apple.WebKit 0.0  11M+ 6  ",
+      "18741  swiftpm-testing- 0.0  21M- 6  ",
+      "18741  swiftpm-testing- 0.0  21M- 6  ",
+      "18741  swiftpm-testing- 0.0  21M  6  ",
+      "18741  swiftpm-testing- 0.0  21M- 5  ",
+      "18741  swiftpm-testing- 0.0  21M+ 5  ",
+      "18741  swiftpm-testing- 0.0  21M- 5  ",
+      "18741  swiftpm-testing- 0.0  21M+ 5  ",
+      "18741  swiftpm-testing- 6.0  24M+ 10 "
+    ],
+    "after-cycles-top": [
+      "49146  swiftpm-testing- 0.0  48M 7  ",
+      "49146  swiftpm-testing- 0.1  48M- 9  ",
+      "49146  swiftpm-testing- 0.2  48M  9  ",
+      "49146  swiftpm-testing- 0.0  48M  9  ",
+      "49146  swiftpm-testing- 0.0  48M- 7  "
+    ]
+  },
+  "validation": {
+    "swift_build": "passed",
+    "swift_test": {
+      "WakeEngineTests": 10,
+      "HeyDotTests": 51
+    },
+    "corrected_before_fixture_pressed": 50,
+    "corrected_after_fixture_pressed": 50,
+    "powermetrics": "must be invoked as the superuser"
+  }
+}
