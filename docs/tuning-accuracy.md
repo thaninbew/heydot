@@ -5,7 +5,9 @@ Branch `heydot-tuning`. Baseline `15a3cad`; after `e5d482e`. Synthetic speech on
 
 - The tuning screen ticked a slot when the lenient detector matched **or** for any 0.35 to 2.8 s utterance
   (`OnboardingModel.heard`). "Hey John" is phrase length, so it ticked.
-- Rare-name spellings can differ from the token sequences the model hears, so calibration must learn heard sequences rather than merely lower the threshold. Personal-name measurements have been omitted from this public snapshot.
+- The detector could not have helped a rare name: its tokenizer spelling (for example `▁LU MI NA RO PO LI S`) can differ
+  from the token path the model actually hears. sherpa-onnx KWS only fires on an exact token path, so such a phrase
+  scored 0 even at threshold 0.01, and calibration then tried looser settings chasing positives it could never catch.
 - The detector never fired on "hey john" either (FA 0/48 before and after). The false success was the tick.
 
 ## Approach
@@ -46,11 +48,16 @@ flow replaced the last with "hey john", which the old screen ticked. Negatives w
 | hey dot | 83.3% | 81.2% | 100 / 100% | 66.7 / 62.5% | 3.4 / 3.6% | 0 / 0 |
 | hey nova | 77.1% | 75.0% | 91.7 / 87.5% | 62.5 / 62.5% | 1.3 / 1.1% | 0 / 0 |
 | hey maximilian | 54.2% | **83.3%** | 70.8 / 95.8% | 37.5 / 70.8% | 0.0 / 0.0% | 0 / 0 |
+| rare five-syllable name | 0.0% | **45.8%** | 0.0 / 66.7% | 0.0 / 25.0% | 0.0 / 0.0% | 0 / 0 |
+| short one-syllable name | 60.4% | **85.4%** | 75.0 / 95.8% | 45.8 / 75.0% | 3.0 / 5.1% | 0 / 0 |
 
+- **Bug flow:** identical to the honest flow after the fix. "hey john" ticked 0 of 40 times. Before, the duration rule
   ticked any phrase-length "hey john".
+- **Short-name FA breakdown:** "hey dre" 0 to 12/48 and "hey troy" 16 to 13/48 (tuned), "hey" and "hey ray" 1/48 each.
   `say` pronounces "Dre" as "Dray", one voicing step from "Tray"; excluding it, tuned FA is 15/480 (3.1%) against
   16/480 (3.3%) before.
 - **Thresholds cannot separate these:** a 0.5 lean and a 0.08 floor each cost TA and removed no FA.
+- **Stuck below three ticks:** 5 of 40 speaker-phrase pairs (the rare name with Eddy and Reed, dot with Rishi and Eddy, nova with
   Reed). The model hears those voices as other words ("PAID OUT", "HEY DAUGHTER"). They fall back to standard.
 - **TV stream:** 107 s of ordinary speech with "hey <other name>" lines, 0 hits for every phrase.
 
@@ -61,6 +68,10 @@ Each measurement is 120 s of audio in 683-sample buffers, run through the live p
 
 | | Idle CPU (one core) | Active CPU | Model RSS |
 |---|---|---|---|
+| Before, standard short name (2 runs) | 1.65-1.66% | 1.64-1.68% | +40.0-42.2 MiB |
+| After, standard short name | 1.68% | 1.76% | +44.0 MiB |
+| After, tuned short name (3 learned) | 1.63% | 1.63% | +42.7 MiB |
+| After, tuned rare name (3 learned) | 1.66% | 1.71% | +41.0 MiB |
 
 All within run-to-run noise. Learned sequences only add context-graph paths, and the beam stays 4.
 - **Tuning only:** the decoder replaces the old preview spotter (one model either way), about 21 ms per utterance.
