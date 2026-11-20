@@ -126,6 +126,26 @@ enum QARender {
                 let failed = model(); failed.setFixture(result: CallResult(outcome: "not-found", message: WebCallBackend.describe("not-found")), signedIn: true); return popover(failed)
             }
 
+            // Not working?: running, stopped at each kind of problem, and all clear.
+            func doctor(_ name: String, running: Bool = false, _ states: [Troubleshooter.Step: Troubleshooter.State]) throws {
+                try both(name) {
+                    let m = model(), d = Troubleshooter(app: m)
+                    d.setFixture(states, running: running)
+                    return TroubleshootView(doctor: d, model: m, retune: {}, signIn: {}, close: {})
+                }
+            }
+            let mic = "the built-in microphone"
+            try doctor("troubleshoot-hearing", running: true, [.microphoneAccess: .ok("HeyDot can use the microphone."),
+                .listening: .ok("Listening on \(mic)."), .hearing: .running])
+            try doctor("troubleshoot-silent", [.microphoneAccess: .ok("HeyDot can use the microphone."),
+                .listening: .ok("Listening on \(mic)."), .hearing: .problem(.silent, "No sound at all is coming from \(mic).")])
+            try doctor("troubleshoot-mic-denied", [.microphoneAccess: .problem(.micDenied, "Microphone access for HeyDot is off in System Settings.")])
+            try doctor("troubleshoot-call-button", [.microphoneAccess: .ok("HeyDot can use the microphone."),
+                .listening: .ok("Listening on \(mic)."), .hearing: .ok("Sound is reaching HeyDot from \(mic)."),
+                .phrase: .ok("Heard \u{201C}Hey Tray\u{201D}."), .signIn: .ok("Signed in to ChatGPT."),
+                .callButton: .problem(.callButton, WebCallBackend.describe("not-found"))])
+            try doctor("troubleshoot-done", Dictionary(uniqueKeysWithValues: Troubleshooter.Step.allCases.map { ($0, .ok("Fine.")) }))
+
             // Onboarding: every step and the tuning screen's states.
             func flow(_ step: OnboardingStep, mic: AVAuthorizationStatus = .authorized, signedIn: Bool? = true,
                       settings change: (inout AppSettings) -> Void = { _ in }, tweak: (OnboardingModel) -> Void = { _ in }) -> OnboardingView {

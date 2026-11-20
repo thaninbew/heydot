@@ -6,7 +6,8 @@ enum PageScripts {
     /// chatgpt.com host, exact dot path (trailing slashes ignored), exactly one enabled button whose
     /// aria-label or text is exactly `label`. Additions for a page HeyDot owns: `signed-out` (login page or
     /// login buttons) and, when clicking, `not-visible` while WebKit still treats the page as hidden (a
-    /// microphone request from a hidden page waits forever). Arguments: dotPath, label, click.
+    /// microphone request from a hidden page waits forever). When the button isn't on the page, it opens the
+    /// dot's profile popover, where ChatGPT now keeps it, and the next poll finds it. Arguments: dotPath, label, click.
     static let press = """
     const trim = (p) => p.replace(/\\/+$/, "");
     const text = (document.body && document.body.innerText) || "";
@@ -21,10 +22,28 @@ enum PageScripts {
         || [...document.querySelectorAll("button, a")].some((b) => /^(log in|sign up|sign up for free)$/i.test(labelOf(b)))) return { outcome: "signed-out" };
     if (trim(location.pathname) !== trim(dotPath)) return { outcome: "wrong-dot", path: location.pathname };
     const calls = buttons.filter((b) => (b.getAttribute("aria-label") || "").trim() === label || (b.textContent || "").trim() === label);
-    if (calls.length === 0) return { outcome: "not-found" };
+    if (calls.length === 0) {
+      // Since Nov 2026 the dot's call button lives in its profile popover ("Open <name>’s profile" in the
+      // header). Opening that popover only shows the profile; the call itself still needs the exact button.
+      // Exactly one opener, never while it reports itself open, and at most once every 2 s so polling can't
+      // toggle it shut again.
+      const openers = buttons.filter((b) => /^open .+[’']s profile$/i.test((b.getAttribute("aria-label") || "").trim()));
+      const now = Date.now();
+      if (openers.length === 1 && openers[0].getAttribute("aria-expanded") !== "true"
+          && now - (globalThis.__heyDotProfileOpenedAt || 0) > 2000) {
+        globalThis.__heyDotProfileOpenedAt = now;
+        openers[0].click();
+        return { outcome: "not-found", opened: true };
+      }
+      // For the log only: what call-like controls the page does show, so a renamed button is diagnosable.
+      return { outcome: "not-found", near: [...document.querySelectorAll("button, [role=button]")]
+        .map(labelOf).filter((l) => /call|voice|talk|speak/i.test(l)).slice(0, 8).map((l) => l.slice(0, 40)) };
+    }
     if (calls.length > 1) return { outcome: "ambiguous" };
     const button = calls[0];
-    if (button.disabled || button.getAttribute("aria-disabled") === "true") return { outcome: "disabled" };
+    // It is a toggle now: pressed means a call is already running.
+    if (button.disabled || button.getAttribute("aria-disabled") === "true" || button.getAttribute("aria-pressed") === "true")
+      return { outcome: "disabled" };
     if (!click) return { outcome: "would-press" };
     if (document.visibilityState !== "visible") return { outcome: "not-visible" };
     button.click();

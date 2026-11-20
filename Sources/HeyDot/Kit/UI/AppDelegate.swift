@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             openSettings: { [weak self] in self?.showSettings() },
             openOnboarding: { [weak self] in self?.showOnboarding() },
             signIn: { [weak self] in self?.popover.performClose(nil); self?.model.showSignIn() },
+            troubleshoot: { [weak self] in self?.showTroubleshooter() },
             quit: { NSApp.terminate(nil) }))
 
         watch = model.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
@@ -151,6 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             flow.leave(flow.step)
             onboarding = nil
         }
+        if key == "troubleshoot" { troubleshooter?.stop(); troubleshooter = nil }
         DispatchQueue.main.async { if !window.isVisible { window.contentViewController = nil } }
     }
 
@@ -175,6 +177,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
                 self?.close("dotmaker")
             },
             onCancel: { [weak self] in self?.close("dotmaker") }), resizable: true, frosted: true)
+    }
+
+    private var troubleshooter: Troubleshooter?
+
+    /// "Not working?": checks each step a call takes and offers the fix for the first one that fails.
+    func showTroubleshooter() {
+        troubleshooter?.stop()
+        let doctor = Troubleshooter(app: model)
+        troubleshooter = doctor
+        present("troubleshoot", title: "Not working?", view: TroubleshootView(
+            doctor: doctor, model: model,
+            retune: { [weak self] in self?.close("troubleshoot"); self?.showOnboarding(startAt: .voice) },
+            signIn: { [weak self] in self?.model.showSignIn() },
+            close: { [weak self] in self?.close("troubleshoot") }), frosted: true)
+        doctor.start()
     }
 
     func showSettings() {

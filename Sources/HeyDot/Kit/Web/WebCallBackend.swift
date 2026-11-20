@@ -308,13 +308,18 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         while true {
             if Task.isCancelled || mine != epoch { return "timeout" }
             if loadError != nil && !view.isLoading { return "load-failed" }
-            outcome = await run(PageScripts.press, args, in: view)["outcome"] as? String ?? "error"
+            let reply = await run(PageScripts.press, args, in: view)
+            outcome = reply["outcome"] as? String ?? "error"
             switch outcome {
             case "pressed", "would-press", "challenge", "ambiguous", "disabled": return outcome
             case "signed-out", "wrong-dot" where !view.isLoading: return outcome
             default: break
             }
             if Date() >= deadline {
+                if outcome == "not-found" {
+                    let near = reply["near"] as? [String] ?? []
+                    log.write("web: no \"\(Self.label)\" button on \(target.path); call-like controls: \(near.isEmpty ? "none" : near.map { "\"\($0)\"" }.joined(separator: ", "))")
+                }
                 return switch outcome {
                 case "not-visible": "hidden"
                 case "error", "signed-out", "wrong-dot": "timeout"
@@ -413,6 +418,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         view.navigationDelegate = self
         view.uiDelegate = self
         signInState.trouble = false
+        signInState.callAttempted = false
         let window = NSWindow(contentViewController: NSHostingController(rootView: SignInView(web: view, state: signInState, done: { [weak self] in
             self?.signInWindow?.close()
         })))
@@ -535,6 +541,8 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         let grant = Self.allowsMicrophone(origin: (origin.protocol, origin.host, origin.port), frameHost: frame.securityOrigin.host,
                                           type: type, callView: webView === self.webView, active: placing || inCall)
         log.write("web: microphone request from \(origin.protocol)://\(origin.host) (\(type == .microphone ? "microphone" : "type \(type.rawValue)")): \(grant ? "granted" : "denied")")
+        // A call started by hand in the ChatGPT window would get no microphone: say where calls start instead.
+        if !grant, webView === signInView { signInState.callAttempted = true }
         decisionHandler(grant ? .grant : .deny)
     }
 
@@ -603,6 +611,8 @@ final class Once {
 @MainActor
 final class SignInState: ObservableObject {
     @Published var trouble = false
+    /// The page in this window asked for the microphone (someone pressed call here), which this window never gets.
+    @Published var callAttempted = false
 }
 
 /// The sign-in window: one line of guidance and Done above chatgpt.com itself.
@@ -622,7 +632,10 @@ struct SignInView: View {
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)
-                if state.trouble {
+                if state.callAttempted {
+                    Text("Calls don\u{2019}t run in this window, so it gets no microphone. Click Done, then call from HeyDot.")
+                        .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                } else if state.trouble {
                     Text("This page couldn’t sign in. Try another sign-in method.")
                         .font(.callout).foregroundStyle(.orange)
                 }

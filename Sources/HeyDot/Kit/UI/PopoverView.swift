@@ -15,6 +15,7 @@ struct PopoverView: View {
     var openSettings: () -> Void
     var openOnboarding: () -> Void
     var signIn: () -> Void = {}
+    var troubleshoot: () -> Void = {}
     var quit: () -> Void
 
     var body: some View {
@@ -251,8 +252,13 @@ struct PopoverView: View {
 
     var footer: some View {
         HStack(spacing: 4) {
-            Label("On this Mac", systemImage: "lock").font(.caption).foregroundStyle(.secondary)
-                .help("Listening runs on this Mac. Details in Settings.")
+            // Always here, since a wake that is never heard leaves no error to act on.
+            Button(action: troubleshoot) {
+                Label("Not working?", systemImage: "questionmark.circle").font(.caption.weight(.medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(showsRecovery ? Color.primary : Color.secondary)
+            .help("Checks the microphone, the wake phrase, your ChatGPT sign-in and the call button, and helps fix what's wrong.")
             Spacer()
             iconButton("paintpalette", "Design your dot", action: openDotMaker)
             iconButton("gearshape", "Settings", action: openSettings).keyboardShortcut(",", modifiers: .command)
