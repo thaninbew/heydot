@@ -312,7 +312,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
             outcome = reply["outcome"] as? String ?? "error"
             switch outcome {
             case "pressed", "would-press", "challenge", "ambiguous", "disabled": return outcome
-            case "signed-out", "wrong-dot" where !view.isLoading: return outcome
+            case "signed-out" where !view.isLoading, "wrong-dot" where !view.isLoading: return outcome
             default: break
             }
             if Date() >= deadline {
