@@ -32,6 +32,7 @@ struct PopoverView: View {
             } else if let hint {
                 Text(hint).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
+            if showsRecovery { recovery }
             primary
             if model.status != .setupNeeded && !model.web.inCall { pauseControls }
             Divider().padding(.top, 2)
@@ -97,6 +98,25 @@ struct PopoverView: View {
                 .disabled(!model.canCallNow)
                 .help("Starts your dot's call now, the same way \u{201C}\(Phrase.title(model.settings.phrase))\u{201D} does.")
             }
+        }
+    }
+
+    /// After a call that didn't start (not a microphone or listener problem): reload the hidden ChatGPT page
+    /// from scratch, or open ChatGPT in a window to see what's wrong and sign in again there.
+    var showsRecovery: Bool {
+        guard case .failed = model.status else { return false }
+        return model.engineError == nil
+    }
+
+    var recovery: some View {
+        HStack(spacing: 6) {
+            Button { model.reloadWeb() } label: { Label("Reload", systemImage: "arrow.clockwise").fixedSize() }
+                .frostButton(.chip)
+                .help("Reloads HeyDot's ChatGPT page from scratch and checks the sign-in again.")
+            Button(action: signIn) { Label("Open ChatGPT", systemImage: "macwindow").fixedSize() }
+                .frostButton(.chip)
+                .help("Shows ChatGPT in a window, so you can see what's wrong and sign in again if you need to.")
+            Spacer(minLength: 0)
         }
     }
 

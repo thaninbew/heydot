@@ -52,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         updateGlyph()
         model.refreshListening()
         model.warmWeb()
+        model.startKeepAlive()
         do { control = try ControlService(model: model) } catch { Log.shared.write("control: \(error)") }
         if !model.settings.onboarded { showOnboarding() }
     }

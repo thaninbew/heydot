@@ -145,6 +145,7 @@ public final class AppModel: ObservableObject {
 
     public func stop() {
         stopped = true
+        keepAlive?.cancel(); keepAlive = nil
         resultExpiry?.cancel(); resultExpiry = nil
         wakeOverride = nil; onPauseChange = nil
         engine.stop()
@@ -189,13 +190,32 @@ public final class AppModel: ObservableObject {
         Task { await call(wakeAt: event.at) }
     }
 
+    /// Bumped by `reloadWeb` so a call still waiting on the old page can't overwrite what follows it.
+    private var callEpoch = 0
+
     public func call(wakeAt: Date = Date()) async {
         guard !stopped, !calling, !web.inCall else { return }
         calling = true
+        let mine = callEpoch
         let result = await placeCall(wakeAt: wakeAt)
+        guard mine == callEpoch else { return }
         calling = false
         guard !stopped else { return }
         show(result)
+        // "Not found" or a timeout can really be a lapsed sign-in: re-read the page so the popover offers
+        // Sign in instead of a call button that will fail again.
+        if !result.pressed, result.outcome != "signed-out" { Task { await refreshWebState() } }
+    }
+
+    /// The popover's Reload: drops the hidden page (and a call stuck waiting on it), then loads it fresh and
+    /// re-reads sign-in.
+    public func reloadWeb() {
+        log.write("web: reload from the menu")
+        callEpoch += 1
+        calling = false
+        web.reset()
+        clearResult()
+        warmWeb()
     }
 
     /// The popover's Call now: the same fail-closed press as a wake, and it works while listening is paused.
@@ -229,8 +249,14 @@ public final class AppModel: ObservableObject {
     }
 
     private func noteWeb(_ outcome: String) {
-        if outcome == "signed-out" { webSignedIn = false }
-        else if ["pressed", "would-press", "disabled", "ambiguous", "not-found"].contains(outcome) { webSignedIn = true }
+        if outcome == "signed-out" { noteSignedIn(false) }
+        else if ["pressed", "would-press", "disabled", "ambiguous"].contains(outcome) { noteSignedIn(true) }
+    }
+
+    /// Records sign-in changes in the log, so how long ChatGPT keeps HeyDot signed in can be measured.
+    private func noteSignedIn(_ signedIn: Bool) {
+        if webSignedIn != signedIn { log.write("web: \(signedIn ? "signed in" : "signed out") (page check)") }
+        webSignedIn = signedIn
     }
 
     // MARK: Built-in browser
@@ -244,8 +270,26 @@ public final class AppModel: ObservableObject {
     @discardableResult
     func refreshWebState() async -> WebPageState {
         let state = await web.pageState()
-        if let signedIn = state.signedIn { webSignedIn = signedIn }
+        if let signedIn = state.signedIn { noteSignedIn(signedIn) }
         return state
+    }
+
+    /// Visits ChatGPT in the hidden page every few hours while HeyDot runs. A page visit is what renews
+    /// ChatGPT's sign-in session, so an idle HeyDot otherwise lets it lapse; it also finds a lapsed sign-in
+    /// before a wake does. Each visit unloads itself after `idleLifetime` like any warm.
+    var keepAliveInterval: Duration = .seconds(4 * 3600)
+    private var keepAlive: Task<Void, Never>?
+
+    public func startKeepAlive() {
+        keepAlive?.cancel()
+        let interval = keepAliveInterval
+        keepAlive = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: interval)
+                guard let self, !Task.isCancelled, !self.stopped else { return }
+                if self.settings.onboarded, !self.calling, !self.web.inCall { self.warmWeb() }
+            }
+        }
     }
 
     public func showSignIn() {

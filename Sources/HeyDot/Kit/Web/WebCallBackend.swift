@@ -35,11 +35,15 @@ public protocol WebCalling: AnyObject {
     func pageState() async -> WebPageState
     func showSignIn(onClose: @escaping () -> Void)
     func signOut() async
+    /// Drops the hidden page and anything still waiting on it (a hung press, a stale page), so the next
+    /// call or warm starts from a fresh load. Ends a running call.
+    func reset()
 }
 
 public extension WebCalling {
     var microphoneMuted: Bool? { nil }
     func setMicrophoneMuted(_ muted: Bool) async -> Bool { false }
+    func reset() {}
 }
 
 /// No built-in browser (tests and fixtures that don't exercise it).
@@ -209,14 +213,30 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     private func conceal() { panel?.orderOut(nil) }
 
+    /// How long one page script may take. A hung or suspended page never answers `callAsyncJavaScript`, and
+    /// without a bound the call (and every later wake) would wait on it forever.
+    var scriptTimeout: Duration = .seconds(5)
+
     private func run(_ script: String, _ arguments: [String: Any] = [:], in view: WKWebView? = nil) async -> [String: Any] {
         guard let view = view ?? webView else { return ["outcome": "error"] }
-        do {
-            let value = try await view.callAsyncJavaScript(script, arguments: arguments, in: nil, contentWorld: .defaultClient)
-            return value as? [String: Any] ?? ["outcome": "error"]
-        } catch {
-            return ["outcome": "error", "error": error.localizedDescription]
+        let timeout = scriptTimeout
+        // The reply crosses the continuation as JSON so nothing non-Sendable leaves the main actor.
+        let reply: Data? = await withCheckedContinuation { (done: CheckedContinuation<Data?, Never>) in
+            let once = Once()
+            view.callAsyncJavaScript(script, arguments: arguments, in: nil, in: .defaultClient) { result in
+                guard once.claim() else { return }
+                let value = try? result.get()
+                done.resume(returning: value.flatMap { JSONSerialization.isValidJSONObject($0) ? try? JSONSerialization.data(withJSONObject: $0) : nil })
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: timeout)
+                guard once.claim() else { return }
+                done.resume(returning: Data("{\"outcome\":\"error\",\"error\":\"page-timeout\"}".utf8))
+            }
         }
+        guard let reply, let value = try? JSONSerialization.jsonObject(with: reply) as? [String: Any] else { return ["outcome": "error"] }
+        if value["error"] as? String == "page-timeout" { log.write("web: the page didn't answer within \(timeout)") }
+        return value
     }
 
     // MARK: Calls
@@ -226,9 +246,13 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         guard !inCall, !placing else { return CallResult(outcome: "disabled", message: Self.describe("in-call")) }
         placing = true; micWasOn = false
         idleUnload?.cancel(); idleUnload = nil
+        let mine = epoch
         defer {
-            placing = false
-            if !inCall { discardIdleView() }
+            // After a reset this press no longer owns the view or the placing flag.
+            if mine == epoch {
+                placing = false
+                if !inCall { discardIdleView() }
+            }
         }
         let began = Date()
         let view = ensureView()
@@ -237,6 +261,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         reveal()
         let outcome = await press(target, view: view, click: true, within: reloaded ? 20 : 12)
         let end = Date()
+        if mine != epoch { return CallResult(outcome: "cancelled", message: "Call cancelled.") }
         if outcome == "pressed" {
             inCall = true
             onCallChange?(nil)
@@ -279,8 +304,9 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         let deadline = Date().addingTimeInterval(seconds)
         let args: [String: Any] = ["dotPath": target.path, "label": Self.label, "click": click]
         var outcome = "not-found"
+        let mine = epoch
         while true {
-            if Task.isCancelled { return "timeout" }
+            if Task.isCancelled || mine != epoch { return "timeout" }
             if loadError != nil && !view.isLoading { return "load-failed" }
             outcome = await run(PageScripts.press, args, in: view)["outcome"] as? String ?? "error"
             switch outcome {
@@ -339,6 +365,18 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         guard inCall else { return }
         log.write("web: ending the call")
         finishCall(problem: nil)
+    }
+
+    /// Bumped by `reset` so a press still polling a dropped page stops and leaves the new state alone.
+    private var epoch = 0
+
+    public func reset() {
+        log.write("web: reset (reloading the page from scratch)")
+        epoch += 1
+        if inCall { finishCall(problem: nil) }
+        callTimeout?.cancel(); callTimeout = nil
+        placing = false; micWasOn = false
+        releaseView()
     }
 
     // MARK: Sign-in
@@ -551,6 +589,13 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         default: "Something went wrong, so nothing was pressed."
         }
     }
+}
+
+/// Lets exactly one of two racing callbacks resume a continuation.
+@MainActor
+final class Once {
+    private var claimed = false
+    func claim() -> Bool { defer { claimed = true }; return !claimed }
 }
 
 /// Whether the sign-in window has hit a page that won't work here (a provider refusing embedded sign-in, or a

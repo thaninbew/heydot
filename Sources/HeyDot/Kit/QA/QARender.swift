@@ -123,7 +123,7 @@ enum QARender {
             let inCall = NoWeb(); inCall.inCall = true; inCall.microphoneMuted = false
             try both("popover-in-call") { popover(model(web: inCall)) }
             try both("popover-call-failed") {
-                let failed = model(); failed.setFixture(result: CallResult(outcome: "wrong-dot"), signedIn: true); return popover(failed)
+                let failed = model(); failed.setFixture(result: CallResult(outcome: "not-found", message: WebCallBackend.describe("not-found")), signedIn: true); return popover(failed)
             }
 
             // Onboarding: every step and the tuning screen's states.

@@ -136,12 +136,14 @@ private func tempDir() throws -> URL {
     let harness = """
     const press = async (dotPath, label, click) => { \(PageScripts.press) };
     const cases = [];
-    function page({ host = "chatgpt.com", path = "/dots/sol", buttons = [["Start call"]], title = "ChatGPT", text = "hello", visible = true }) {
+    function page({ host = "chatgpt.com", path = "/dots/sol", buttons = [["Start call"]], links = [], title = "ChatGPT", text = "hello", visible = true }) {
       const made = buttons.map(([label, disabled = false]) => ({ clicked: 0, disabled, textContent: "",
         getAttribute: (k) => (k === "aria-label" ? label : null), click() { this.clicked++; } }));
       globalThis.location = { host, pathname: path, href: "https://" + host + path };
       globalThis.document = { title, body: { innerText: text }, visibilityState: visible ? "visible" : "hidden",
-        querySelector: () => null, querySelectorAll: () => made };
+        querySelector: () => null,
+        querySelectorAll: (sel) => sel === "button" ? made
+          : [...made, ...links.map((label) => ({ textContent: label, getAttribute: () => null }))] };
       return made;
     }
     const run = async (name, spec, click, want) => {
@@ -159,6 +161,7 @@ private func tempDir() throws -> URL {
     await run("login host", { host: "auth.openai.com" }, true, "signed-out");
     await run("login page", { path: "/auth/login" }, true, "signed-out");
     await run("login buttons", { buttons: [["Log in"], ["Start call"]] }, true, "signed-out");
+    await run("login link", { buttons: [], links: ["Log in"] }, true, "signed-out");
     await run("two buttons", { buttons: [["Start call"], ["Start call"]] }, true, "ambiguous");
     await run("disabled", { buttons: [["Start call", true]] }, true, "disabled");
     await run("near label", { buttons: [["Start call now"]] }, true, "not-found");
@@ -175,11 +178,59 @@ private func tempDir() throws -> URL {
     try process.run(); process.waitUntilExit()
     #expect(process.terminationStatus == 0)
     let cases = try JSONSerialization.jsonObject(with: pipe.fileHandleForReading.readDataToEndOfFile()) as? [[String: Any]] ?? []
-    #expect(cases.count == 14)
+    #expect(cases.count == 15)
     for c in cases {
         let name = c["name"] as? String ?? "?", got = c["got"] as? String, want = c["want"] as? String
         #expect(got == want, "\(name): \(got ?? "nil") != \(want ?? "nil")")
         #expect((c["clicks"] as? Int ?? -1) == (want == "pressed" ? 1 : 0), "\(name) clicked wrongly")
     }
     try? FileManager.default.removeItem(at: dir)
+}
+
+/// A press that never returns (a hung page) must not wedge HeyDot: Reload frees it and the next call works.
+@MainActor private final class HungWeb: WebCalling {
+    var inCall = false
+    var onCallChange: ((String?) -> Void)?
+    var hang = true
+    var resets = 0
+    var calls = 0
+    var signedIn: Bool? = true
+    private var pending: CheckedContinuation<CallResult, Never>?
+    func call(dotURL: String, wakeAt: Date) async -> CallResult {
+        calls += 1
+        guard hang else { return CallResult(outcome: "pressed") }
+        return await withCheckedContinuation { pending = $0 }
+    }
+    func release() { pending?.resume(returning: CallResult(outcome: "not-found")); pending = nil }
+    func check(dotURL: String) async -> CallResult { CallResult(outcome: "would-press") }
+    func endCall() {}
+    func warm(dotURL: String?) {}
+    func pageState() async -> WebPageState { WebPageState(signedIn: signedIn) }
+    func showSignIn(onClose: @escaping () -> Void) {}
+    func signOut() async {}
+    func reset() { resets += 1 }
+}
+
+@MainActor @Test func reloadFreesAHungCallAndAFailedCallRechecksSignIn() async {
+    let web = HungWeb()
+    var s = AppSettings(); s.onboarded = true; s.dotURL = "https://chatgpt.com/dots/sol"
+    let model = AppModel(settings: s, engine: FakeEngine(), enroller: FakeEnroller(), web: web,
+                         hooks: QARender.fakeHooks(), store: nil, log: Log(url: URL(fileURLWithPath: "/dev/null")))
+    let hung = Task { await model.call() }
+    while web.calls == 0 { await Task.yield() }
+    #expect(model.calling && !model.canCallNow)
+    model.reloadWeb()
+    #expect(web.resets == 1 && !model.calling && model.canCallNow)
+    web.hang = false
+    await model.call()
+    #expect(model.lastResult?.pressed == true)
+    web.release(); await hung.value
+    #expect(model.lastResult?.pressed == true)       // the stale press can't overwrite the newer result
+    // A "not found" that is really a lapsed sign-in ends on Sign in, not on a dead Call button.
+    web.hang = true; web.signedIn = false
+    let failing = Task { await model.call() }
+    while web.calls < 3 { await Task.yield() }
+    web.release(); await failing.value
+    for _ in 0..<20 { await Task.yield() }
+    #expect(model.status == .signInNeeded)
 }

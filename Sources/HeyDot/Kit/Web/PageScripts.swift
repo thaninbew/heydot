@@ -16,7 +16,9 @@ enum PageScripts {
         || document.querySelector("iframe[src*='challenges.cloudflare.com'], .cf-turnstile, #challenge-form, #cf-chl-widget")
         || /verify you are human|checking your browser/i.test(text)) return { outcome: "challenge" };
     if (location.host !== "chatgpt.com") return { outcome: /(^|\\.)openai\\.com$/.test(location.host) ? "signed-out" : "wrong-dot", host: location.host };
-    if (location.pathname.startsWith("/auth") || buttons.some((b) => /^(log in|sign up|sign up for free)$/i.test(labelOf(b)))) return { outcome: "signed-out" };
+    // A signed-out dot page shows "Log in" as a link, not only as a button.
+    if (location.pathname.startsWith("/auth")
+        || [...document.querySelectorAll("button, a")].some((b) => /^(log in|sign up|sign up for free)$/i.test(labelOf(b)))) return { outcome: "signed-out" };
     if (trim(location.pathname) !== trim(dotPath)) return { outcome: "wrong-dot", path: location.pathname };
     const calls = buttons.filter((b) => (b.getAttribute("aria-label") || "").trim() === label || (b.textContent || "").trim() === label);
     if (calls.length === 0) return { outcome: "not-found" };
