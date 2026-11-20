@@ -196,7 +196,8 @@ struct TroubleshootView: View {
         }
         .padding(24)
         .frame(width: 460)
-        .background(FrostBackdrop(animated: false, material: false).ignoresSafeArea())
+        // A window has nothing behind it but the desktop, so it needs the blur material (the popover brings its own).
+        .background(FrostBackdrop(animated: false).ignoresSafeArea())
         .frostAccent(model.settings.design)
         .onAppear { devices = AudioInputs.all() }
     }
