@@ -63,14 +63,19 @@ Prefer not to run a downloaded build? [Build it yourself](#build-from-source) in
 ## How it works
 
 1. **Listening.** HeyDot captures 16 kHz audio from one chosen microphone and runs it through an on-device [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) keyword spotter tuned to your phrase. Nothing is recorded or sent anywhere while it waits.
-2. **Waking.** When it hears your phrase, it opens your dot's page in a built-in, hidden ChatGPT web view (signed in once, by you) and presses its **Start call** button for you.
+2. **Waking.** When it hears your phrase, it opens your dot's page in a built-in, hidden ChatGPT web view (signed in once, by you) and presses its call button for you.
 3. **Talking.** From there it's a normal ChatGPT voice call: your call audio goes to ChatGPT, just as it does in the ChatGPT app. Hang up or mute from the menu bar.
 
 **What leaves your Mac:** only your normal ChatGPT session (the web view talks to ChatGPT and whichever sign-in provider you use). HeyDot has no servers, no analytics and no telemetry. Details in [SECURITY.md](SECURITY.md).
 
 ## Limitations
 
-- HeyDot drives ChatGPT's own web page. If that page changes, calls may stop working until HeyDot is updated.
+HeyDot is an early, hobby-sized project. Expect rough edges.
+
+- **It will break sometimes.** HeyDot presses buttons on ChatGPT's own web page, and that page changes without notice (the call button moved in November 2026). When that happens, calls stop working until HeyDot is updated. Watch this repo for releases, and please [open an issue](../../issues) if calls stop.
+- **If something's off,** click **Not working?** in the menu bar popover. It checks your microphone, listening, your wake phrase, your ChatGPT sign-in and the call button, one at a time, and offers the fix for whatever fails.
+- **Not notarized.** macOS warns you the first time you open it (see [Install](#install)), and may ask about the keychain after each update. A notarized build may come if there's interest.
+- **Your ChatGPT sign-in can expire.** HeyDot keeps it fresh, but if ChatGPT signs you out, use **Open ChatGPT** in the popover to sign in again.
 - Short, distinct names work best. Very long or unusual names are harder to spot reliably, and sound-alikes can occasionally trigger it. Voice tuning helps.
 - English wake phrases only, for now.
 - Apple silicon only.
