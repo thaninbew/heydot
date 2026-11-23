@@ -47,7 +47,7 @@ It's free, open source, and has no account, server or API key of its own.
 2. Open it. HeyDot isn't notarized by Apple yet, so macOS will block it the first time. Go to **System Settings > Privacy & Security**, scroll down, click **Open Anyway** next to HeyDot, and confirm.
 3. Follow the setup: name your dot, tune your voice, sign in to ChatGPT. That's it.
 
-**After an update,** macOS may ask once to let HeyDot use **"HeyDot WebCrypto Master Key"** in your keychain. That's the encryption key HeyDot's built-in browser uses to protect what ChatGPT saves on your Mac. "WebCrypto" is the standard name for encryption in web pages; it has nothing to do with cryptocurrency, and HeyDot never reads the key. Enter your Mac password and click **Always Allow**.
+**After an update,** macOS may ask once to let HeyDot use **"HeyDot WebCrypto Master Key"**. HeyDot's built-in ChatGPT window uses it to keep your sign-in secure. HeyDot never reads it, and it isn't related to cryptocurrency. Enter your Mac password and click **Always Allow**.
 
 Prefer not to run a downloaded build? [Build it yourself](#build-from-source) in a couple of minutes.
 
