@@ -203,7 +203,7 @@ final class RecordingTuner: VoiceTuner {
         #expect(Accent.contrast(fill, Accent.darkWindow) >= 3, "button on a dark window")
         #expect(Accent.contrast(Accent.mark(fill, dark: true), Accent.darkWindow) >= Accent.markContrast, "marks on a dark window (3:1 since round 7)")
     }
-    #expect(Accent.hex(for: .default) == Accent.ui(Accent.defaultHex), "an undesigned dot uses Frost's violet")
+    #expect(Accent.hex(for: .default) == Accent.ui(Accent.defaultHex), "an undesigned dot uses the logo's coral")
     #expect(Accent.hex(for: DotDesign(shape: .roundedTriangle, color: .lime, accessory: .headphones, fill: .colorBody)) == Accent.ui(DotColor.lime.hex))
     #expect(Accent.hex(for: DotDesign(shape: .roundedTriangle, color: .lime, accessory: .headphones, fill: .colorBody)) != Accent.hex(for: DotDesign(color: .yellow)))
 }
@@ -267,12 +267,12 @@ final class RecordingTuner: VoiceTuner {
 // MARK: Theme from dot
 
 @Test func themeIsFrostUntilThereIsADotAndDeterministicAfter() {
-    #expect(Theme.forDesign(.default) == Theme.from(palette: [DotColor.violet.hex]))
+    #expect(Theme.forDesign(.default) == Theme.from(palette: [Accent.defaultHex]), "the default logo themes from its coral")
     let body = DotDesign.default.color.hex, eyes = Accent.ink(for: body)
     #expect(DotDesign.default.fill == .colorBody)
     #expect(Accent.contrast(body, eyes) >= 4.4)
     #expect(OKLCH.hueDistance(OKLCH(hex: body).h, OKLCH(hex: eyes).h) < 3)
-    #expect(Theme.frost.light == [0x9B7CFF, 0xFFB08A, 0x8EC5FF] && Theme.frost.accent == Accent.ui(Accent.defaultHex))
+    #expect(Theme.frost.light == [0xFB9890, 0xF4BF8C, 0xF4A0C8] && Theme.frost.accent == Accent.ui(Accent.defaultHex))
     var avatar = DotDesign.default; avatar.signature = nil
     avatar.custom = CustomArt(id: "x", silhouette: true)
     #expect(Theme.forDesign(avatar) == .frost, "an imported avatar has no palette to read")

@@ -3,16 +3,12 @@ import QuartzCore
 import SwiftUI
 
 // Frost: HeyDot's window and popover look. A see-through window the wallpaper tints, two soft tint blobs drifting
-// behind the content, the app tile floating at the centre and violet Liquid Glass buttons (macOS 26), with a
+// behind the content, the app tile floating at the centre and accent-tinted Liquid Glass buttons (macOS 26), with a
 // drawn fallback on macOS 14 and 15. Motion runs as Core Animation in the render server, so it costs the app no
 // CPU, stops when the window is closed or occluded, and is off with Reduce Motion.
 
 /// The design tokens (DESIGN.md): every surface takes its sizes, radii and spacing from here.
 enum Frost {
-    /// The default dot's eye violet, and the deeper and lighter ends of the primary button.
-    static let violet = Color(hex: 0x7B61FF)
-    static let violetDeep = Color(hex: 0x6146F0)
-    static let violetLight = Color(hex: 0x9D8BFF)
 
     /// Pill heights: the main pill (primary, secondary, round) and the chip (inline actions, pause chips, choices).
     static let pillHeight: CGFloat = 46
@@ -28,9 +24,9 @@ enum Frost {
         static let xs: CGFloat = 4, s: CGFloat = 8, m: CGFloat = 12, l: CGFloat = 16, xl: CGFloat = 24, xxl: CGFloat = 32
     }
     static let blobs: [(color: UInt32, x: CGFloat, y: CGFloat, radius: CGFloat)] = [
-        (0x9B7CFF, 0.08, 0.10, 0.62),  // violet, top left
-        (0xFFB08A, 0.95, 0.12, 0.55),  // peach, top right
-        (0x8EC5FF, 0.55, 1.05, 0.50),  // blue, bottom
+        (0xFB9890, 0.08, 0.10, 0.62),  // coral, top left
+        (0xF4BF8C, 0.95, 0.12, 0.55),  // peach, top right
+        (0xF4A0C8, 0.55, 1.05, 0.50),  // pink, bottom
     ]
 }
 
@@ -38,9 +34,9 @@ enum Frost {
 
 /// The UI accent follows the dot's colour: its hue and saturation, with lightness moved into the one band where
 /// white button text stays readable (at least 4.5:1) and marks still stand out on a dark window (at least 3:1
-/// against #1E1E1E) and a light one. The default logo, custom avatars and an undesigned dot use Frost's violet.
+/// against #1E1E1E) and a light one. The default logo, custom avatars and an undesigned dot use the logo's coral.
 enum Accent {
-    static let defaultHex: UInt32 = 0x7B61FF
+    static let defaultHex: UInt32 = 0xFB817A  // the logo's coral
     static let darkWindow: UInt32 = 0x1E1E1E
     static let lightWindow: UInt32 = 0xF2F2F5
     /// Relative luminance band that meets both contrast floors.
@@ -97,7 +93,7 @@ enum Accent {
     static func ink(for fill: UInt32) -> UInt32 { OKLCH(l: 0.16, c: 0.02, h: OKLCH(hex: fill).h).hexInGamut }
 
     static func source(for design: DotDesign) -> UInt32 {
-        design.custom != nil ? defaultHex : design.color.hex
+        design.custom != nil || design == .default ? defaultHex : design.color.hex
     }
 
     static func hex(for design: DotDesign) -> UInt32 { ui(source(for: design)) }
@@ -428,7 +424,7 @@ final class FloatingTileView: NSView {
         layer = CALayer()
         wantsLayer = true
         layer?.masksToBounds = false
-        tile.shadowColor = NSColor(Frost.violetDeep).cgColor
+        tile.shadowColor = NSColor(Color(hex: Accent.defaultHex)).cgColor
         tile.shadowOpacity = 0.24
         layer?.addSublayer(tile)
     }

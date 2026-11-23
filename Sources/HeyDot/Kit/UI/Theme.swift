@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The whole look follows the dot (DESIGN.md, "Theme from dot"): the backdrop's three tint stops and the accent
 /// come from the dot's own colours by one deterministic formula in OKLCH. Imported avatars keep Frost;
-/// the default HeyDot logo follows its violet.
+/// the default HeyDot logo follows its coral.
 struct Theme: Equatable, Sendable {
     /// Backdrop stops (sRGB hex), in `Frost.blobs` order: top left, top right, bottom.
     let light: [UInt32]
@@ -18,7 +18,7 @@ struct Theme: Equatable, Sendable {
 
     func stops(dark isDark: Bool) -> [UInt32] { isDark ? dark : light }
 
-    /// Frost: violet, peach and blue, with the violet accent.
+    /// Frost: coral, peach and pink, with the coral accent.
     static let frost: Theme = {
         let stops = Frost.blobs.map(\.color)
         return Theme(light: stops, dark: stops, accent: Accent.ui(Accent.defaultHex))
@@ -41,6 +41,7 @@ struct Theme: Equatable, Sendable {
     /// when the dot wears one in a colour (charcoal and brown are ink, not hue). Empty for imported avatars.
     static func palette(for design: DotDesign) -> [UInt32] {
         guard design.custom == nil else { return [] }
+        if design == .default { return [Accent.defaultHex] }  // the logo's coral, not the mic's stored colour
         var colors = [design.color.hex]
         if design.accessory != .none, ![.charcoal, .brown].contains(design.accessoryColor), design.accessoryColor != design.color {
             colors.append(design.accessoryColor.hex)
