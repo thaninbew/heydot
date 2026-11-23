@@ -18,7 +18,7 @@ BUILD="${HEYDOT_BUILD:-1}"
 # HEYDOT_FEED_URL points a test build at a local appcast; releases use the repo's.
 FEED_URL="${HEYDOT_FEED_URL:-https://raw.githubusercontent.com/thaninbew/heydot/main/appcast.xml}"
 # Verifies every update's EdDSA signature. The private half stays in the maintainer's keychain.
-SPARKLE_PUBLIC_KEY="__SPARKLE_PUBLIC_KEY__"
+SPARKLE_PUBLIC_KEY="9VdeVbZaSiUxhE/sqPKe3pbD8O4aqxjMBoQCQ9M2eFs="
 if [[ "$PREVIEW" != "--preview" ]]; then
   CERT="${HEYDOT_APPROVED_CERT_SHA1:-}"
   [[ "$CERT" =~ ^[[:xdigit:]]{40}$ ]] || { echo "HEYDOT_APPROVED_CERT_SHA1 (40 hex) is required. No ad-hoc fallback. Use --preview for fixtures only." >&2; exit 78; }
