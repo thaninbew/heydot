@@ -90,6 +90,8 @@ if [[ "$PREVIEW" == "--preview" ]]; then
   exit 0
 fi
 
+# Debug symbols are a third of the binary and nothing at run time needs them (Xcode strips release apps the same way).
+strip "$APP/Contents/MacOS/HeyDot"
 # SwiftPM's build-folder rpath would load an unsigned Sparkle from this checkout instead of the bundled one.
 otool -l "$APP/Contents/MacOS/HeyDot" | awk '/LC_RPATH/ {getline; getline; print $2}' | { grep "^$PWD/" || true; } | while read -r path; do
   install_name_tool -delete_rpath "$path" "$APP/Contents/MacOS/HeyDot"
