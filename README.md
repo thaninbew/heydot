@@ -14,11 +14,13 @@
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-FB817A?logo=apple&logoColor=white">
   <img alt="Apple silicon" src="https://img.shields.io/badge/Apple%20silicon-only-FB817A">
   <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-FB817A">
+  <a href="../../releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/thaninbew/heydot/total?color=FB817A&label=downloads"></a>
+  <a href="../../stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/thaninbew/heydot?color=FB817A&logo=github"></a>
 </p>
 
 Say **"Hey Dot"** (or "Hey" plus whatever you named your dot) from across the room, and your ChatGPT dot picks up. HeyDot sits in your menu bar, listens for that one phrase on your Mac, and starts the voice call for you. No clicking around, no window hunting.
 
-It's free, open source, and has no account, server or API key of its own.
+It's free, open source, and has no account, server or API key of its own. If HeyDot saves you a click, a ⭐ helps other people find it.
 
 > [!IMPORTANT]
 > **macOS will warn you the first time you open HeyDot.** It isn't notarized by Apple yet, so macOS says it "could not verify HeyDot is free of malware". That's the standard message for any app without a paid Apple Developer ID, not a sign that something is wrong, and every line of HeyDot's code is in this repo. I'm getting an Apple Developer account now so future versions open without the warning. Until then, [here's how to open it](#install).

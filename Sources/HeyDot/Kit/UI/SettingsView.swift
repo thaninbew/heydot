@@ -133,6 +133,8 @@ struct SettingsView: View {
             Section {
                 HStack {
                     Button("Show log in Finder") { NSWorkspace.shared.activateFileViewerSelecting([model.log.location]) }
+                    Button("HeyDot on GitHub") { model.hooks.openURL(AppModel.repository) }
+                        .help("Source code, releases and issues. A star helps other people find HeyDot.")
                     Spacer()
                     Button("Run setup again\u{2026}", action: rerunSetup)
                 }

@@ -34,6 +34,7 @@ struct PopoverView: View {
                 Text(hint).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if showsRecovery { recovery }
+            if model.asksForStar, model.lastResult == nil, !model.web.inCall { starCard.transition(.opacity) }
             primary
             if model.status != .setupNeeded && !model.web.inCall { pauseControls }
             Divider().padding(.top, 2)
@@ -44,6 +45,24 @@ struct PopoverView: View {
         .background(FrostBackdrop(animated: false, material: false).ignoresSafeArea())
         .frostAccent(model.settings.design)
         .animation(.easeOut(duration: 0.2), value: model.lastResult)
+    }
+
+    /// Asked once, after a few calls that worked. Either button answers it for good.
+    var starCard: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "star.fill").foregroundStyle(.frostMark)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Enjoying HeyDot? A star on GitHub helps other people find it.")
+                    .font(.callout).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 6) {
+                    Button("Star on GitHub") { model.answerStarCard(star: true) }.frostButton(.chip)
+                    Button("Not now") { model.answerStarCard(star: false) }.frostButton(.chip)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(.frostMark.opacity(0.12), in: RoundedRectangle(cornerRadius: Frost.Radius.inset, style: .continuous))
     }
 
     func dismiss(_ result: CallResult) -> (() -> Void)? {

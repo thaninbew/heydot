@@ -10,6 +10,7 @@ public struct SystemHooks {
     public var launchAtLoginEnabled: () -> Bool
     public var microphoneStatus: () -> AVAuthorizationStatus
     public var requestMicrophone: (@escaping @Sendable (Bool) -> Void) -> Void
+    public var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
 
     @MainActor
     public static func live() -> SystemHooks {
@@ -202,6 +203,7 @@ public final class AppModel: ObservableObject {
         calling = false
         guard !stopped else { return }
         show(result)
+        if result.pressed, !settings.starAsked { update { $0.callsStarted += 1 } }
         // "Not found" or a timeout can really be a lapsed sign-in: re-read the page so the popover offers
         // Sign in instead of a call button that will fail again.
         if !result.pressed, result.outcome != "signed-out" { Task { await refreshWebState() } }
@@ -342,6 +344,17 @@ public final class AppModel: ObservableObject {
     static func clock(minutes: Int, calendar: Calendar = .current) -> String {
         let date = calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: Date()) ?? Date()
         return date.formatted(date: .omitted, time: .shortened)
+    }
+
+    /// HeyDot's GitHub page (source, releases, issues).
+    static let repository = URL(string: "https://github.com/thaninbew/heydot")!
+
+    /// After a few calls that worked, the popover asks once for a GitHub star.
+    var asksForStar: Bool { !settings.starAsked && settings.callsStarted >= 3 }
+
+    func answerStarCard(star: Bool) {
+        update { $0.starAsked = true }
+        if star { hooks.openURL(Self.repository) }
     }
 
     public func clearResult() { resultExpiry?.cancel(); lastResult = nil; flashing = false }
