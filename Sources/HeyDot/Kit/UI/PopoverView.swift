@@ -52,7 +52,7 @@ struct PopoverView: View {
 
     var header: some View {
         HStack(spacing: 12) {
-            DotTile(model.settings.design, size: 52, dark: true)
+            DotTile(model.settings.design, size: 52)
                 .overlay {
                     if model.web.inCall {
                         RoundedRectangle(cornerRadius: 52 * 0.23 + 4, style: .continuous)

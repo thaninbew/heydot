@@ -119,7 +119,7 @@ public struct DotDesign: Codable, Equatable, Hashable, Sendable {
     public var accessory: DotAccessory = .none
     public var accessoryColor: DotColor = .charcoal
     public var nickname: String = ""
-    public var fill: DotFill = .inkBody
+    public var fill: DotFill = .colorBody
     /// When set, the body is a hand-authored mark instead of `shape`. Picking a shape clears it.
     public var signature: DotSignature?
     /// An imported avatar drawn instead of the dot (Design your dot > Custom avatar). Picking a shape clears it.
@@ -127,7 +127,7 @@ public struct DotDesign: Codable, Equatable, Hashable, Sendable {
 
     public init(shape: DotShape = .circle, color: DotColor = .violet, eyes: DotEyes = .oval, glasses: DotGlasses = .none,
                 accessory: DotAccessory = .none, accessoryColor: DotColor = .charcoal, nickname: String = "",
-                fill: DotFill = .inkBody, signature: DotSignature? = nil, custom: CustomArt? = nil) {
+                fill: DotFill = .colorBody, signature: DotSignature? = nil, custom: CustomArt? = nil) {
         self.shape = shape; self.color = color; self.eyes = eyes; self.glasses = glasses; self.accessory = accessory
         self.accessoryColor = accessoryColor; self.nickname = nickname; self.fill = fill; self.signature = signature
         self.custom = custom
@@ -136,7 +136,7 @@ public struct DotDesign: Codable, Equatable, Hashable, Sendable {
     /// The HeyDot logo: the dot as a microphone head in its cradle ("8. Open cradle", picked from the round-3 board).
     public static let `default` = DotDesign(fill: .colorBody, signature: .mic)
     /// The previous default (sound arcs). Saved designs equal to it load as the new default.
-    static let previousDefault = DotDesign(signature: .hey)
+    static let previousDefault = DotDesign(fill: .inkBody, signature: .hey)
 
     public var isDefaultLogo: Bool { signature == .mic || signature == .hey || signature == .heyWave || signature == .heyBubble }
 }

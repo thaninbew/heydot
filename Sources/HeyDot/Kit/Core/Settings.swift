@@ -66,7 +66,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? base.launchAtLogin
         design = try c.decodeIfPresent(DotDesign.self, forKey: .design) ?? base.design
         // Earlier default logos follow the owner-selected open-cradle violet mic.
-        if design == .previousDefault || design == DotDesign(signature: .mic) { design = .default }
+        if design == .previousDefault || design == DotDesign(fill: .inkBody, signature: .mic) { design = .default }
         onboarded = try c.decodeIfPresent(Bool.self, forKey: .onboarded) ?? base.onboarded
         menuBarIcon = try c.decodeIfPresent(MenuBarIcon.self, forKey: .menuBarIcon) ?? base.menuBarIcon
         inputDeviceUID = try c.decodeIfPresent(String.self, forKey: .inputDeviceUID)
