@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/banner-dark.png">
-    <img alt="HeyDot. Always within earshot. A free, open-source Mac menu bar app for your ChatGPT dots." src=".github/assets/banner-light.png" width="100%">
-  </picture>
+  <img alt="HeyDot. Always within earshot. Someone says Hey Dot, the dot answers Hey, what's up?, and HeyDot's menu bar popover shows the call starting." src=".github/assets/demo.webp" width="100%">
 </p>
 
 <p align="center">
