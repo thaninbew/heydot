@@ -21,6 +21,7 @@ framework, sockets to remote hosts, update checks, crash reporters or analytics.
 | Control socket | `~/Library/Application Support/HeyDot/run/` | sockets 0600, folder 0700; only your user can connect |
 | Log | `~/Library/Logs/HeyDot.log` (and one rotated `HeyDot.log.1`) | files 0600 (set by the log-rotation change) in your 0700 `~/Library/Logs` |
 | ChatGPT sign-in (cookies and site data) | `~/Library/WebKit/app.heydot.HeyDot/WebsiteDataStore/` | managed by macOS WebKit; HeyDot never reads it |
+| WebCrypto key (16 random bytes WebKit uses to protect keys the ChatGPT page stores) | `~/Library/Application Support/HeyDot/webcrypto.key` | file 0600, folder 0700. HeyDot hands it to WebKit through a private WebKit hook, so WebKit never makes a keychain item or asks for your password. A WebKit without the hook falls back to its own "HeyDot WebCrypto Master Key" keychain item |
 
 **Not persisted by HeyDot:** wake-word or tuning audio. ChatGPT call audio is handled by ChatGPT under its own policies. Voice tuning keeps your sample clips in memory only while you tune. The
 listener reads the microphone continuously but keeps only a short rolling buffer in memory. It records from the

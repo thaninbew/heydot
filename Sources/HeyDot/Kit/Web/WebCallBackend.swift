@@ -507,6 +507,20 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         decisionHandler(allowed ? .allow : .cancel)
     }
 
+    private var cryptoKey: Data??
+
+    /// WebKit SPI (WKNavigationDelegatePrivate). Supplying the WebCrypto master key keeps WebKit away from its
+    /// keychain item, so updates don't bring back a password prompt. A WebKit without this falls back to the keychain.
+    @objc(_webCryptoMasterKeyForWebView:completionHandler:)
+    public func webCryptoMasterKey(for webView: WKWebView, completionHandler: @escaping (Data?) -> Void) {
+        if cryptoKey == nil {
+            let key = WebCryptoKey.load()
+            cryptoKey = .some(key)
+            log.write(key == nil ? "web: couldn't keep a WebCrypto key; WebKit uses the keychain" : "web: supplied the WebCrypto key")
+        }
+        completionHandler(cryptoKey ?? nil)
+    }
+
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         guard webView === self.webView else { return }
         loadError = error.localizedDescription

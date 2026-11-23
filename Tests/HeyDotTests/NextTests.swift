@@ -296,3 +296,17 @@ private func tempDir() throws -> URL {
     await model.call()
     #expect(model.settings.callsStarted == 3)  // counting stops once it's answered
 }
+
+@Test func webCryptoKeyIsMadeOnceAndPrivate() throws {
+    let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: home) }
+    let paths = Paths(home: home)
+    let first = try #require(WebCryptoKey.load(paths: paths))
+    #expect(first.count == 16)
+    #expect(WebCryptoKey.load(paths: paths) == first)
+    let mode = try FileManager.default.attributesOfItem(atPath: WebCryptoKey.url(paths).path)[.posixPermissions] as? NSNumber
+    #expect(mode?.int16Value == 0o600)
+    try Data([1, 2, 3]).write(to: WebCryptoKey.url(paths))   // a damaged key is replaced, not used
+    let second = try #require(WebCryptoKey.load(paths: paths))
+    #expect(second.count == 16 && second != first)
+}
