@@ -185,6 +185,15 @@ extension EnvironmentValues {
     var frostLabel: Color { Color(hex: Accent.label(on: frostAccentHex)) }
 }
 
+/// `frostMark` as a style, resolved where it's drawn. Good news (signed in, call started, a check passed) uses the
+/// dot's own colour, never a stock green that fights the theme.
+struct FrostMarkStyle: ShapeStyle {
+    func resolve(in environment: EnvironmentValues) -> Color { environment.frostMark }
+}
+extension ShapeStyle where Self == FrostMarkStyle {
+    static var frostMark: FrostMarkStyle { FrostMarkStyle() }
+}
+
 extension View {
     /// Sets the accent for this subtree from a dot design: glass tint, focus rings, progress, rings, switches, links.
     /// Since round 6 the whole theme follows the dot (`Theme`), not only the accent.
@@ -481,11 +490,10 @@ final class FloatingTileView: NSView {
 struct TileRings: View {
     let size: CGFloat
     var level: Float?
-    var tint: Color?
     @Environment(\.self) private var env
 
     var body: some View {
-        let tint = tint ?? env.frostMark
+        let tint = env.frostMark
         let f = CGFloat(max(0, min(1, ((level ?? -60) + 60) / 54)))
         ZStack {
             Circle().strokeBorder(tint.opacity(0.14 + 0.3 * f), lineWidth: 1.5)
@@ -674,13 +682,13 @@ struct FrostBanner<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .top, spacing: Frost.Space.s) {
             Image(systemName: good ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(good ? .green : .orange)
+                .foregroundStyle(good ? AnyShapeStyle(.frostMark) : AnyShapeStyle(.orange))
             Text(message).font(.callout).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             trailing
         }
         .padding(.horizontal, Frost.Space.m).padding(.vertical, 10)
-        .background((good ? Color.green : Color.orange).opacity(0.12), in: RoundedRectangle(cornerRadius: Frost.Radius.inset, style: .continuous))
+        .background(good ? AnyShapeStyle(.frostMark.opacity(0.12)) : AnyShapeStyle(Color.orange.opacity(0.12)), in: RoundedRectangle(cornerRadius: Frost.Radius.inset, style: .continuous))
     }
 }
 

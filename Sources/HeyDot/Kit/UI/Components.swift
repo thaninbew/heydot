@@ -9,7 +9,7 @@ struct StatusPill: View {
     var color: Color {
         switch status {
         case .listening: env.frostMark
-        case .calling: .green
+        case .calling: env.frostMark
         case .paused: .secondary
         default: .orange
         }

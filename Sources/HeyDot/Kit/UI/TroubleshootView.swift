@@ -238,7 +238,7 @@ struct TroubleshootView: View {
         switch state {
         case .waiting: Image(systemName: "circle.dotted").foregroundStyle(.tertiary).font(.system(size: 17))
         case .running: ProgressView().controlSize(.small)
-        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.system(size: 17))
+        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(.frostMark).font(.system(size: 17))
         case .problem: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.system(size: 17))
         }
     }
@@ -304,7 +304,7 @@ struct TroubleshootView: View {
         Divider()
         HStack {
             if doctor.done {
-                Label("Everything checks out.", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+                Label("Everything checks out.", systemImage: "checkmark.seal.fill").foregroundStyle(.frostMark)
                     .font(.callout.weight(.semibold))
             } else if doctor.running {
                 Text("Checking\u{2026}").font(.callout).foregroundStyle(.secondary)

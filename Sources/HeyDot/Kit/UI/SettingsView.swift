@@ -83,7 +83,7 @@ struct SettingsView: View {
                     HStack {
                         if let result = model.lastResult, result.outcome != "pressed" {
                             Label(result.message, systemImage: result.wouldPress ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                .foregroundStyle(result.wouldPress ? .green : .orange).lineLimit(2)
+                                .foregroundStyle(result.wouldPress ? AnyShapeStyle(.frostMark) : AnyShapeStyle(.orange)).lineLimit(2)
                                 .frame(maxWidth: 260, alignment: .trailing)
                         }
                         Button(checking ? "Checking\u{2026}" : "Check") {
@@ -96,7 +96,7 @@ struct SettingsView: View {
                 LabeledContent("Sign-in") {
                     HStack {
                         Text(model.webSignedIn == true ? "Signed in" : (model.webSignedIn == false ? "Signed out" : "Checking\u{2026}"))
-                            .foregroundStyle(model.webSignedIn == true ? .green : .secondary)
+                            .foregroundStyle(model.webSignedIn == true ? AnyShapeStyle(.frostMark) : AnyShapeStyle(.secondary))
                         Button(model.webSignedIn == true ? "Open ChatGPT\u{2026}" : "Sign in\u{2026}", action: model.showSignIn)
                         if model.webSignedIn == true {
                             Button("Sign out", role: .destructive) { Task { await model.signOutWeb() } }

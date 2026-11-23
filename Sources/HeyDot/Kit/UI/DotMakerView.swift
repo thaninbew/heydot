@@ -157,7 +157,7 @@ struct DotMakerView: View {
                     .frostButton(.chip)
                     Button(showPrompt ? "Hide prompt" : "Show prompt") { showPrompt.toggle() }.frostButton(.chip)
                     if promptCopied {
-                        Label("Copied", systemImage: "checkmark").font(.callout).foregroundStyle(.green)
+                        Label("Copied", systemImage: "checkmark").font(.callout).foregroundStyle(.frostMark)
                     }
                 }
                 if showPrompt { FrostCodePreview(text: Self.avatarPrompt) }

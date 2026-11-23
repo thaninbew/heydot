@@ -507,11 +507,11 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             ZStack {
-                TileRings(size: 112, tint: flow.heard ? .green : nil)
+                TileRings(size: 112)
                 FloatingTile(design: app.settings.design, size: 112)
                 if flow.heard {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 34)).foregroundStyle(.white, .green)
+                        .font(.system(size: 34)).foregroundStyle(.white, .frostMark)
                         .offset(x: 50, y: 50)
                         .transition(.scale.combined(with: .opacity))
                 }

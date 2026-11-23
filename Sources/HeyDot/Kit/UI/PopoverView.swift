@@ -56,7 +56,7 @@ struct PopoverView: View {
                 .overlay {
                     if model.web.inCall {
                         RoundedRectangle(cornerRadius: 52 * 0.23 + 4, style: .continuous)
-                            .strokeBorder(Color.green, lineWidth: 2.5).padding(-4)
+                            .strokeBorder(.frostMark, lineWidth: 2.5).padding(-4)
                     }
                 }
             VStack(alignment: .leading, spacing: 3) {
