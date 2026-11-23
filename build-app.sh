@@ -15,7 +15,8 @@ MODEL=sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01
 # Sparkle compares CFBundleVersion, so every release raises HEYDOT_BUILD.
 VERSION="${HEYDOT_VERSION:-0.1.0}"
 BUILD="${HEYDOT_BUILD:-1}"
-FEED_URL="https://raw.githubusercontent.com/thaninbew/heydot/main/appcast.xml"
+# HEYDOT_FEED_URL points a test build at a local appcast; releases use the repo's.
+FEED_URL="${HEYDOT_FEED_URL:-https://raw.githubusercontent.com/thaninbew/heydot/main/appcast.xml}"
 # Verifies every update's EdDSA signature. The private half stays in the maintainer's keychain.
 SPARKLE_PUBLIC_KEY="__SPARKLE_PUBLIC_KEY__"
 if [[ "$PREVIEW" != "--preview" ]]; then
