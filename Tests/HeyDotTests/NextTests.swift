@@ -274,3 +274,25 @@ private func tempDir() throws -> URL {
     #expect(fine.1.calls == 0)                                  // saying the phrase during the check placed no call
     #expect(fine.3.wakeOverride == nil)                         // wakes go back to calls afterwards
 }
+
+@MainActor @Test func theStarCardAsksOnceAfterThreeCallsThatStarted() async {
+    let web = FakeWeb()
+    var opened: [URL] = []
+    var hooks = QARender.fakeHooks()
+    hooks.openURL = { opened.append($0) }
+    var s = AppSettings(); s.onboarded = true; s.dotURL = "https://chatgpt.com/dots/sol"
+    let model = AppModel(settings: s, engine: FakeEngine(), enroller: FakeEnroller(), web: web,
+                         hooks: hooks, store: nil, log: Log(url: URL(fileURLWithPath: "/dev/null")))
+    web.outcome = "not-found"
+    await model.call()                       // a call that didn't start doesn't count
+    web.outcome = "pressed"
+    for _ in 0..<2 { await model.call() }
+    #expect(!model.asksForStar)
+    await model.call()
+    #expect(model.asksForStar)
+    model.answerStarCard(star: true)
+    #expect(opened == [AppModel.repository])
+    #expect(!model.asksForStar)
+    await model.call()
+    #expect(model.settings.callsStarted == 3)  // counting stops once it's answered
+}

@@ -24,6 +24,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// The microphone the user chose (Core Audio UID); nil is the built-in microphone. HeyDot never follows the
     /// macOS default input, and falls back to the built-in microphone while the chosen one is disconnected.
     public var inputDeviceUID: String?
+    /// Calls that started, counted only until the one-time GitHub star card has been answered.
+    public var callsStarted: Int = 0
+    /// The popover's "star on GitHub" card was answered (either button); it never shows again.
+    public var starAsked: Bool = false
 
     public init() {}
 
@@ -70,6 +74,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         onboarded = try c.decodeIfPresent(Bool.self, forKey: .onboarded) ?? base.onboarded
         menuBarIcon = try c.decodeIfPresent(MenuBarIcon.self, forKey: .menuBarIcon) ?? base.menuBarIcon
         inputDeviceUID = try c.decodeIfPresent(String.self, forKey: .inputDeviceUID)
+        callsStarted = try c.decodeIfPresent(Int.self, forKey: .callsStarted) ?? base.callsStarted
+        starAsked = try c.decodeIfPresent(Bool.self, forKey: .starAsked) ?? base.starAsked
     }
 }
 

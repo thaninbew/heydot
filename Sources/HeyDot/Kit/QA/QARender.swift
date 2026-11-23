@@ -33,7 +33,8 @@ struct FakeEnroller: WakeEnrolling {
 enum QARender {
     static func fakeHooks(mic: AVAuthorizationStatus = .authorized) -> SystemHooks {
         SystemHooks(setLaunchAtLogin: { _ in },
-                    launchAtLoginEnabled: { true }, microphoneStatus: { mic }, requestMicrophone: { _ in })
+                    launchAtLoginEnabled: { true }, microphoneStatus: { mic }, requestMicrophone: { _ in },
+                    openURL: { _ in })
     }
 
     static func model(_ change: (inout AppSettings) -> Void = { _ in }, mic: AVAuthorizationStatus = .authorized,
@@ -105,6 +106,7 @@ enum QARender {
 
             // Popover states
             try both("popover-listening") { popover(model()) }
+            try both("popover-star") { popover(model { $0.callsStarted = 3 }) }
             try snapshot(popover(model { $0.paused = true }), to: out("popover-paused"))
             let until = Calendar.current.date(bySettingHour: 21, minute: 41, second: 0, of: Date()) ?? Date()
             try both("popover-paused-timed") { popover(model { $0.paused = true; $0.pausedUntil = until }) }
