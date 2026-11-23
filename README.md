@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="HeyDot. Always within earshot. Someone says Hey Dot, the dot answers Hey, what's up?, and HeyDot's menu bar popover shows the call starting." src=".github/assets/demo.webp" width="100%">
+  <img alt="HeyDot. Always within earshot. Someone says Hey Dot, the dot answers Hey, what's up?, and HeyDot's menu bar popover shows the call starting. Mid-call the dot keeps changing its colour, shape and name, and the app follows each one." src=".github/assets/demo.webp" width="100%">
 </p>
 
 <p align="center">
