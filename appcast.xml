@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>HeyDot</title>
+    <link>https://github.com/thaninbew/heydot</link>
+    <description>HeyDot's update feed, read by Sparkle in the app. Each release adds one signed item; see docs/DEVELOPMENT.md.</description>
+    <language>en</language>
+  </channel>
+</rss>

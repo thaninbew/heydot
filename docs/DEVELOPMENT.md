@@ -159,9 +159,31 @@ swift test --no-parallel
 HEYDOT_APPROVED_CERT_SHA1=<40 hex> ./build-app.sh release   # signed, hardened runtime, audio-input entitlement
 ```
 
+`HEYDOT_VERSION` and `HEYDOT_BUILD` set `CFBundleShortVersionString` and `CFBundleVersion` (default 0.1.0 and 1).
+The bundle embeds Sparkle.framework without its XPC services and re-signs Sparkle's Autoupdate, Updater.app and the
+framework with the same certificate as the app.
+
 `release` refuses to run without `HEYDOT_APPROVED_CERT_SHA1`, refuses a certificate that is not a valid
 code signing identity on this Mac, and never falls back to ad-hoc
 signing. Neither mode installs the app or registers a login item. Assembly runs only the icon renderer; it does not start listening or place calls.
+
+## Releasing an update
+
+HeyDot updates itself through [Sparkle](https://sparkle-project.org) from `appcast.xml` on `main`
+(`SUFeedURL`). Sparkle installs an update only when its EdDSA signature matches `SUPublicEDKey` in build-app.sh
+and its code signature matches the running app's.
+
+1. Raise `HEYDOT_BUILD` (Sparkle compares it) and `HEYDOT_VERSION`, then build the release.
+2. `ditto -c -k --sequesterRsrc --keepParent HeyDot.app HeyDot-<version>.zip`
+3. `.build/artifacts/sparkle/Sparkle/bin/sign_update HeyDot-<version>.zip` prints the `sparkle:edSignature` and
+   `length` attributes. It reads the private key from the maintainer's login keychain.
+4. Attach the zip to the GitHub release, then add an `<item>` to `appcast.xml` whose enclosure points at that asset,
+   with `sparkle:version` set to the build, `sparkle:shortVersionString` to the version and
+   `sparkle:minimumSystemVersion` 14.0. Merging it to `main` offers the update to everyone.
+
+The private key was made once with Sparkle's `generate_keys` and lives only in the maintainer's keychain; back it
+up with `generate_keys -x <file>` to somewhere safe. HeyDot isn't signed with a Developer ID, so a lost key can't be
+replaced: existing installs would never accept another update and would need a manual download.
 
 ## Clean uninstall
 

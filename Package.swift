@@ -6,6 +6,10 @@ import PackageDescription
 let package = Package(
     name: "HeyDot",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        // Self-updates. Exact official release; build-app.sh embeds and re-signs the framework.
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
+    ],
     targets: [
         // On-device keyword spotting (sherpa-onnx C API), microphone capture, enrollment calibration.
         // Owned by the engine workstream. Exposes only the contract in WakeEngineAPI.swift.
@@ -23,12 +27,14 @@ let package = Package(
         .executableTarget(name: "heydot-engine-check", dependencies: ["WakeEngine"], path: "Sources/WakeEngine/EngineCheck"),
         // The menu bar app: onboarding, dot maker and hidden browser.
         // Owned by the app workstream.
-        .target(name: "HeyDotKit", dependencies: ["WakeEngine"], path: "Sources/HeyDot/Kit",
+        .target(name: "HeyDotKit", dependencies: ["WakeEngine", .product(name: "Sparkle", package: "Sparkle")], path: "Sources/HeyDot/Kit",
                 // The avatar prompt, compiled into the binary (no resource bundle to ship).
                 resources: [.embedInCode("Resources/AvatarAgentPrompt.md"),
                             .embedInCode("Resources/Logo8_1024.png"), .embedInCode("Resources/Logo8_32.png"),
                             .embedInCode("Resources/Logo8_16.png")]),
-        .executableTarget(name: "HeyDot", dependencies: ["HeyDotKit"], path: "Sources/HeyDot/Main"),
+        .executableTarget(name: "HeyDot", dependencies: ["HeyDotKit"], path: "Sources/HeyDot/Main",
+                          // Finds the bundled Sparkle.framework in HeyDot.app/Contents/Frameworks.
+                          linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]),
         .testTarget(name: "HeyDotTests", dependencies: ["HeyDotKit", "WakeEngine"], path: "Tests/HeyDotTests"),
         .testTarget(name: "WakeEngineTests", dependencies: ["WakeEngine"], path: "Tests/WakeEngineTests", resources: [.copy("Fixtures")]),
     ]

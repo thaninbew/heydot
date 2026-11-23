@@ -16,11 +16,14 @@ HeyDot's original code is Apache-2.0; see LICENSE. The following components are 
 | kaldi-decoder | 0.3.0 | Apache-2.0; licenses/kaldi-decoder/LICENSE |
 | nlohmann/json | 3.12.0 | MIT; licenses/json/ |
 | Eigen (decoder headers) | 3.4.0, selected in kaldi-decoder 0.3.0 | MPL-2.0 and per-file terms; licenses/eigen-3.4.0/ (MPL-2.0 and bundled alternative license texts) |
+| Sparkle (Sparkle.framework, bundled for self-updates) | 2.10.1, official Swift Package Manager release asset | MIT, with bsdiff (BSD-2-Clause), sais-lite (MIT), orlp/ed25519 (zlib) and SUSignatureVerifier (BSD) notices; licenses/Sparkle/LICENSE |
 | GigaSpeech KWS Zipformer model, 3.3M | 2024-01-01 | Apache-2.0 declaration in licenses/GigaSpeech-model-card.md |
 
 The model comes from the official k2-fsa/sherpa-onnx `kws-models` release asset `sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2`, SHA-256 `f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a`. Its fetched README explicitly declares Apache License 2.0 and describes GigaSpeech XL training using icefall. The original model card is shipped next to the int8 weights, tokens and BPE model, with the full Apache-2.0 license. This provenance note does not resolve separate training-data rights questions.
 
 The dependency versions above are derived from the fetched sherpa-onnx v1.13.8 source CMake inputs, and their checksum-verified dependency source archives. The prebuilt static release contains libraries only, without license/NOTICE files or a full build manifest. This limits what can be proven about its transitive contents. ONNX Runtime is incorporated through sherpa-onnx, not downloaded separately by Scripts/fetch-vendor.sh. Its selected static package is identified in upstream `cmake/onnxruntime-osx-arm64-static.cmake` as `onnxruntime-osx-arm64-static_lib-1.28.2.zip` (SHA-256 `bf6e35dc9440d2899c3d21f52b1045fb99176a6ae822281b7245c5418cc338ab`). PortAudio and TTS archives are not linked by Package.swift.
+
+Sparkle comes from the official sparkle-project/Sparkle `Sparkle-for-Swift-Package-Manager.zip` release asset for tag 2.10.1 (commit ab7d71291238df6e0492143b120c9b696a35f603), SHA-256 `4c2e48a3e50ebcc2c88a58a4c7264a1a99c3c31857ce754357afb9cdb323022a`, which SwiftPM checks on download. Its LICENSE is copied unchanged from that archive. Sparkle's XPC services are not shipped.
 
 macOS frameworks, libc++ and Accelerate are linked system components supplied by Apple, not redistributed in the ZIP. The original avatar artwork and embedded prompts are covered by HeyDot's LICENSE. The WAV test fixtures are synthesized using macOS system voices; their redistribution rights have not been established, so the root Apache license must not be interpreted as resolving those rights.
 

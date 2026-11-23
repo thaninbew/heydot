@@ -4,6 +4,8 @@ import WakeEngine
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    /// The app passes its one updater; QA renders and tests get an inert one (no feed URL outside a built app).
+    @ObservedObject var updates = Updates()
     var retune: () -> Void
     var rerunSetup: () -> Void
     var openDotMaker: () -> Void
@@ -126,6 +128,12 @@ struct SettingsView: View {
                 }
                 Toggle("Open at login", isOn: Binding(get: { model.settings.launchAtLogin }, set: setLogin))
                 if let loginError { Text(loginError).foregroundStyle(.orange).font(.callout) }
+                LabeledContent {
+                    Button("Check for Updates\u{2026}", action: updates.check).disabled(!updates.canCheck)
+                } label: {
+                    Text("Updates")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"). Updates come from HeyDot's GitHub page.")
+                }
             }
             Section("Privacy") {
                 PrivacyNote(phrase: model.settings.phrase, viewer: "settings")
