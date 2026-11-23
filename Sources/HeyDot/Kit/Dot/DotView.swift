@@ -105,8 +105,7 @@ public struct DotView: View {
     }
 }
 
-/// A dot on a frosted rounded tile: translucent white with the dot's own colours in light mode, translucent ink
-/// with a white body in dark mode.
+/// A dot on a frosted rounded tile (translucent white, lighter in dark mode) in the dot's own colours.
 public struct DotTile: View {
     @Environment(\.colorScheme) private var scheme
     let design: DotDesign
@@ -124,18 +123,18 @@ public struct DotTile: View {
                 .frame(width: size * 1024 / 824, height: size * 1024 / 824)
                 .frame(width: size, height: size)
         } else {
-            // Frosted, so the window's theme shows through and the dot is the only colour on it: translucent white
-            // in light mode, translucent ink in dark mode.
+            // Frosted glass in both appearances, so the window's theme shows through and the dot is the only colour on
+            // it: more white in light mode, a lighter veil in dark mode.
             let isDark = dark ?? (scheme == .dark)
             RoundedRectangle(cornerRadius: size * 0.23, style: .continuous)
-                .fill(isDark ? DotInk.ink.opacity(0.45) : Color.white.opacity(0.45))
+                .fill(Color.white.opacity(isDark ? 0.16 : 0.45))
                 .overlay {
                     DotView(design, style: isDark ? .inverted : .standard)
                         .padding(size * 0.14)
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: size * 0.23, style: .continuous)
-                        .strokeBorder(isDark ? Color.white.opacity(0.1) : Color.white.opacity(0.8), lineWidth: 1)
+                        .strokeBorder(Color.white.opacity(isDark ? 0.22 : 0.8), lineWidth: 1)
                 }
                 .frame(width: size, height: size)
         }

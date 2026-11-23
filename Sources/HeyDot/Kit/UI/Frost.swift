@@ -377,7 +377,7 @@ final class FrostBackdropView: NSView {
 struct FloatingTile: View {
     let design: DotDesign
     let size: CGFloat
-    var dark: Bool? = true
+    var dark: Bool?
     var floats = true
     @Environment(\.frostSnapshot) private var snapshot
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
