@@ -52,8 +52,6 @@ It's free, open source, and has no account, server or API key of its own. If Hey
 2. Open it. Because HeyDot isn't notarized yet, macOS stops it the first time with **"HeyDot" Not Opened: Apple could not verify "HeyDot" is free of malware that may harm your Mac or compromise your privacy.** Click **Done** (not Move to Trash). Then go to **System Settings > Privacy & Security**, scroll down, click **Open Anyway** next to HeyDot, and confirm. You only do this once.
 3. Follow the setup: name your dot, tune your voice, sign in to ChatGPT. That's it.
 
-**After an update,** macOS may ask once to let HeyDot use **"HeyDot WebCrypto Master Key"**. HeyDot's built-in ChatGPT window uses it to keep your sign-in secure. HeyDot never reads it, and it isn't related to cryptocurrency. Enter your Mac password and click **Always Allow**.
-
 Prefer not to run a downloaded build? [Build it yourself](#build-from-source) in a couple of minutes.
 
 ## How it works
@@ -70,7 +68,7 @@ HeyDot is an early, hobby-sized project. Expect rough edges.
 
 - **It will break sometimes.** HeyDot presses buttons on ChatGPT's own web page, and that page changes without notice (the call button moved in November 2026). When that happens, calls stop working until HeyDot is updated. Watch this repo for releases, and please [open an issue](../../issues) if calls stop.
 - **If something's off,** click **Not working?** in the menu bar popover. It checks your microphone, listening, your wake phrase, your ChatGPT sign-in and the call button, one at a time, and offers the fix for whatever fails.
-- **Not notarized yet.** I'm getting an Apple Developer account so HeyDot can be notarized. Until then, macOS warns you the first time you open it (see [Install](#install)) and may ask about the keychain after an update.
+- **Not notarized yet.** I'm getting an Apple Developer account so HeyDot can be notarized. Until then, macOS warns you the first time you open it (see [Install](#install)).
 - **Your ChatGPT sign-in can expire.** HeyDot keeps it fresh, but if ChatGPT signs you out, use **Open ChatGPT** in the popover to sign in again.
 - Short, distinct names work best. Very long or unusual names are harder to spot reliably, and sound-alikes can occasionally trigger it. Voice tuning helps.
 - English wake phrases only, for now.
