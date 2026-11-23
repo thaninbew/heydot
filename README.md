@@ -11,9 +11,9 @@
 </p>
 
 <p align="center">
-  <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-7B61FF?logo=apple&logoColor=white">
-  <img alt="Apple silicon" src="https://img.shields.io/badge/Apple%20silicon-only-7B61FF">
-  <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-7B61FF">
+  <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-FB817A?logo=apple&logoColor=white">
+  <img alt="Apple silicon" src="https://img.shields.io/badge/Apple%20silicon-only-FB817A">
+  <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-FB817A">
 </p>
 
 Say **"Hey Dot"** (or "Hey" plus whatever you named your dot) from across the room, and your ChatGPT dot picks up. HeyDot sits in your menu bar, listens for that one phrase on your Mac, and starts the voice call for you. No clicking around, no window hunting.
@@ -23,15 +23,9 @@ It's free, open source, and has no account, server or API key of its own.
 > Unofficial; not affiliated with OpenAI.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/popover-dark.png">
-    <img alt="HeyDot's menu bar popover: listening for Hey Dot, with a Call button and pause options" src=".github/assets/popover-light.png" width="348">
-  </picture>
+  <img alt="HeyDot's menu bar popover: listening for Hey Dot, with a Call button and pause options" src=".github/assets/popover-light.png" width="348">
   &nbsp;&nbsp;
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/tuning-dark.png">
-    <img alt="Voice tuning: say the wake phrase four times" src=".github/assets/tuning-light.png" width="456">
-  </picture>
+  <img alt="Voice tuning: say the wake phrase four times" src=".github/assets/tuning-light.png" width="456">
 </p>
 
 ## What you get
