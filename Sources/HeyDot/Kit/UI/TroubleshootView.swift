@@ -185,7 +185,7 @@ struct TroubleshootView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Let\u{2019}s find what\u{2019}s wrong").font(.system(size: 20, weight: .bold))
+                Text("Let\u{2019}s find what\u{2019}s wrong").font(.system(size: 20, weight: .semibold))
                 Text("HeyDot checks each step a call takes, in order, and stops at the first one that fails.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }

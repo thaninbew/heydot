@@ -55,7 +55,7 @@ enum QARender {
     static func snapshot<V: View>(_ view: V, to url: URL, dark: Bool = false, size fixed: CGSize? = nil,
                                   background: NSColor = .windowBackgroundColor) throws {
         let themed = view.background(Color(nsColor: .windowBackgroundColor)).environment(\.colorScheme, dark ? .dark : .light)
-            .environment(\.frostSnapshot, true)
+            .environment(\.frostSnapshot, true).fontDesign(.rounded)
         let root: AnyView = fixed.map { AnyView(themed.frame(width: $0.width, height: $0.height)) } ?? AnyView(themed.fixedSize())
         let hosting = NSHostingView(rootView: root)
         hosting.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)

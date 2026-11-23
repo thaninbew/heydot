@@ -71,7 +71,7 @@ struct OnboardingView: View {
 
     func heading(_ title: String, _ detail: String? = nil, size: CGFloat = 34) -> some View {
         VStack(spacing: 10) {
-            Text(title).font(.system(size: size, weight: .bold)).tracking(-0.6)
+            Text(title).font(.system(size: size, weight: .semibold)).tracking(size * -0.02)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             if let detail {
                 Text(detail).font(.system(size: 16)).foregroundStyle(.secondary)

@@ -558,7 +558,7 @@ private struct FrostButtonBody: View {
     var body: some View {
         let height = role == .chip ? Frost.chipHeight : Frost.pillHeight
         configuration.label
-            .font(.system(size: role == .chip ? 13 : 15, weight: filled ? .bold : .medium))
+            .font(.system(size: role == .chip ? 13 : 15, weight: filled ? .semibold : .medium))
             .foregroundStyle(role == .hangUp ? Color.white : role == .primary ? Color(hex: Accent.label(on: accentHex))
                              : (configuration.role == .destructive ? Color.red : Color.primary))
             .lineLimit(1)

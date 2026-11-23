@@ -421,7 +421,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         signInState.callAttempted = false
         let window = NSWindow(contentViewController: NSHostingController(rootView: SignInView(web: view, state: signInState, done: { [weak self] in
             self?.signInWindow?.close()
-        })))
+        }).fontDesign(.rounded)))
         window.title = "Sign in to ChatGPT"
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         window.setContentSize(NSSize(width: 980, height: 760))

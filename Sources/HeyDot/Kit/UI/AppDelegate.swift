@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             openOnboarding: { [weak self] in self?.showOnboarding() },
             signIn: { [weak self] in self?.popover.performClose(nil); self?.model.showSignIn() },
             troubleshoot: { [weak self] in self?.showTroubleshooter() },
-            quit: { NSApp.terminate(nil) }))
+            quit: { NSApp.terminate(nil) }).fontDesign(.rounded))
 
         watch = model.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
             Task { @MainActor in self?.updateGlyph() }
@@ -119,12 +119,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private func present<V: View>(_ key: String, title: String, view: V, resizable: Bool = false, frosted: Bool = false) {
         popover.performClose(nil)
         if let window = windows[key] {
-            window.contentViewController = NSHostingController(rootView: view)
+            window.contentViewController = NSHostingController(rootView: view.fontDesign(.rounded))
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: view.fontDesign(.rounded)))
         window.title = title
         window.styleMask = resizable ? [.titled, .closable, .resizable, .miniaturizable] : [.titled, .closable]
         if frosted {
