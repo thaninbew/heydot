@@ -74,6 +74,8 @@ if [[ "$PREVIEW" == "--preview" ]]; then
   exit 0
 fi
 
+# Debug symbols are a third of the binary and nothing at run time needs them (Xcode strips release apps the same way).
+strip "$APP/Contents/MacOS/HeyDot"
 APP_REQ="identifier \"app.heydot.HeyDot\" and certificate leaf = H\"$CERT\""
 codesign --force --options runtime --timestamp=none --sign "$CERT" --requirements "=designated => $APP_REQ" \
   --entitlements Resources/HeyDot.entitlements "$APP"
