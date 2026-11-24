@@ -181,7 +181,8 @@ and its code signature matches the running app's.
    certificate and `HEYDOT_NOTARY_PROFILE`.
 2. `ditto -c -k --sequesterRsrc --keepParent HeyDot.app HeyDot-<version>.zip`
 3. `.build/artifacts/sparkle/Sparkle/bin/sign_update HeyDot-<version>.zip` prints the `sparkle:edSignature` and
-   `length` attributes. It reads the private key from the maintainer's login keychain.
+   `length` attributes. It reads the private key from the maintainer's login keychain; the first run asks for the
+   keychain password, so click Always Allow.
 4. Attach the zip to the GitHub release, then add an `<item>` to `appcast.xml` whose enclosure points at that asset,
    with `sparkle:version` set to the build, `sparkle:shortVersionString` to the version and
    `sparkle:minimumSystemVersion` 14.0. Merging it to `main` offers the update to everyone.
