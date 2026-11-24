@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private var watch: AnyCancellable?
     private var appearanceWatch: NSKeyValueObservation?
     private var control: ControlService?
+    private var updates: Updates!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let store = SettingsStore()
@@ -26,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         model = AppModel(settings: settings, engine: WakeEngine(log: { Log.shared.write($0) }), enroller: Enroller(),
                          web: WebCallBackend(), hooks: .live(), store: loadError == nil ? store : nil)
         model.settingsError = loadError
+        updates = Updates()
         Log.shared.write("app: started, version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
 
         installEditMenu()
@@ -196,7 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
 
     func showSettings() {
         present("settings", title: "HeyDot Settings", view: SettingsView(
-            model: model,
+            model: model, updates: updates,
             retune: { [weak self] in self?.showOnboarding(startAt: .voice) },
             rerunSetup: { [weak self] in self?.showOnboarding() },
             openDotMaker: { [weak self] in self?.showDotMaker() }), resizable: true, frosted: true)

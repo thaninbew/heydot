@@ -40,6 +40,7 @@ It's free, open source, and has no account, server or API key of its own. If Hey
 - **Out of the way.** A menu bar icon, no Dock icon. Pause for 15 minutes, an hour or until tomorrow. The microphone is released while your display sleeps or the Mac is locked.
 - **Your mic, not whatever's default.** It uses the built-in microphone unless you pick another, so it won't grab your AirPods mid FaceTime.
 - **Your dot, your colours.** Give it a shape, colour and eyes, and the whole app themes itself around it.
+- **Updates itself.** HeyDot asks before it checks this repo for new versions, and installs them only when they carry the project's signature.
 
 ## Requirements
 
@@ -60,13 +61,13 @@ Prefer not to run a downloaded build? [Build it yourself](#build-from-source) in
 2. **Waking.** When it hears your phrase, it opens your dot's page in a built-in, hidden ChatGPT web view (signed in once, by you) and presses its call button for you.
 3. **Talking.** From there it's a normal ChatGPT voice call: your call audio goes to ChatGPT, just as it does in the ChatGPT app. Hang up or mute from the menu bar.
 
-**What leaves your Mac:** only your normal ChatGPT session (the web view talks to ChatGPT and whichever sign-in provider you use). HeyDot has no servers, no analytics and no telemetry. Details in [SECURITY.md](SECURITY.md).
+**What leaves your Mac:** your normal ChatGPT session (the web view talks to ChatGPT and whichever sign-in provider you use), and update checks against this GitHub repo (once a day if you allow automatic checks, or when you click **Check for Updates…** in Settings). An update check sends only the request itself, with HeyDot's version in it. HeyDot has no servers, no analytics and no telemetry. Details in [SECURITY.md](SECURITY.md).
 
 ## Limitations
 
 HeyDot is an early, hobby-sized project. Expect rough edges.
 
-- **It will break sometimes.** HeyDot presses buttons on ChatGPT's own web page, and that page changes without notice (the call button moved in November 2026). When that happens, calls stop working until HeyDot is updated. Watch this repo for releases, and please [open an issue](../../issues) if calls stop.
+- **It will break sometimes.** HeyDot presses buttons on ChatGPT's own web page, and that page changes without notice (the call button moved in November 2026). When that happens, calls stop working until HeyDot is updated. HeyDot checks for fixes itself, and please [open an issue](../../issues) if calls stop.
 - **If something's off,** click **Not working?** in the menu bar popover. It checks your microphone, listening, your wake phrase, your ChatGPT sign-in and the call button, one at a time, and offers the fix for whatever fails.
 - **Not notarized yet.** I'm getting an Apple Developer account so HeyDot can be notarized. Until then, macOS warns you the first time you open it (see [Install](#install)).
 - **Your ChatGPT sign-in can expire.** HeyDot keeps it fresh, but if ChatGPT signs you out, use **Open ChatGPT** in the popover to sign in again.

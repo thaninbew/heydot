@@ -1,15 +1,17 @@
 # HeyDot: what it stores and what leaves your Mac
 
-**Short version:** Wake-word listening runs on device and its audio is never uploaded. Call audio goes to ChatGPT like any ChatGPT voice call. The built-in web view contacts ChatGPT and its sign-in providers, including their normal page resources. HeyDot has no servers, accounts of its own, telemetry or analytics.
+**Short version:** Wake-word listening runs on device and its audio is never uploaded. Call audio goes to ChatGPT like any ChatGPT voice call. The built-in web view contacts ChatGPT and its sign-in providers, including their normal page resources. HeyDot checks this project's GitHub repo for updates. HeyDot has no servers, accounts of its own, telemetry or analytics.
 
 ## What leaves your Mac
 
 | What | Where it goes | When |
 | --- | --- | --- |
 | Your ChatGPT session (the chatgpt.com page, your sign-in, the voice call) | chatgpt.com, and the sign-in page you choose (OpenAI, Google, Apple or Microsoft) | When you sign in, when HeyDot keeps your dot's page ready, and during a call |
+| An update check (Sparkle): a request for `appcast.xml` that carries HeyDot's and Sparkle's versions in its User-Agent, no system profile | raw.githubusercontent.com | Once a day if you allow automatic checks (Sparkle asks on the second launch), or when you click **Check for Updates…** in Settings |
+| An update download | github.com release assets | When you choose to install an update |
 
-HeyDot's own code makes no network requests. Searching the source finds no `URLSession`, `Network`
-framework, sockets to remote hosts, update checks, crash reporters or analytics. Its call view restricts top-level navigation to `https://chatgpt.com/...`; this is not a firewall for page resources or sign-in providers.
+Apart from Sparkle's update checks, HeyDot's own code makes no network requests. Searching the source finds no `URLSession`, `Network`
+framework, sockets to remote hosts, crash reporters or analytics. Sparkle installs an update only when its EdDSA signature matches the public key built into HeyDot and it is signed with the same certificate as the running app. Its call view restricts top-level navigation to `https://chatgpt.com/...`; this is not a firewall for page resources or sign-in providers.
 
 ## What HeyDot stores, and where
 
