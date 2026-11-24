@@ -157,6 +157,7 @@ swift build
 swift test --no-parallel
 ./build-app.sh debug --preview   # HeyDotPreview.app: unsigned, fixtures and screenshots only
 HEYDOT_APPROVED_CERT_SHA1=<40 hex> ./build-app.sh release   # signed, hardened runtime, audio-input entitlement
+HEYDOT_APPROVED_CERT_SHA1=<40 hex> HEYDOT_NOTARY_PROFILE=<profile> ./build-app.sh release   # also notarized and stapled
 ```
 
 `HEYDOT_VERSION` and `HEYDOT_BUILD` set `CFBundleShortVersionString` and `CFBundleVersion` (default 0.1.0 and 1).
@@ -165,7 +166,10 @@ framework with the same certificate as the app.
 
 `release` refuses to run without `HEYDOT_APPROVED_CERT_SHA1`, refuses a certificate that is not a valid
 code signing identity on this Mac, and never falls back to ad-hoc
-signing. Neither mode installs the app or registers a login item. Assembly runs only the icon renderer; it does not start listening or place calls.
+signing. With `HEYDOT_NOTARY_PROFILE` it signs with a secure timestamp, submits the app to Apple's notary service,
+staples the ticket and checks it with `spctl`. The profile comes from
+`xcrun notarytool store-credentials <profile> --apple-id <id> --team-id <team>`, which keeps an app-specific
+password in the login keychain. Neither mode installs the app or registers a login item. Assembly runs only the icon renderer; it does not start listening or place calls.
 
 ## Releasing an update
 
@@ -173,7 +177,8 @@ HeyDot updates itself through [Sparkle](https://sparkle-project.org) from `appca
 (`SUFeedURL`). Sparkle installs an update only when its EdDSA signature matches `SUPublicEDKey` in build-app.sh
 and its code signature matches the running app's.
 
-1. Raise `HEYDOT_BUILD` (Sparkle compares it) and `HEYDOT_VERSION`, then build the release.
+1. Raise `HEYDOT_BUILD` (Sparkle compares it) and `HEYDOT_VERSION`, then build the release with the Developer ID
+   certificate and `HEYDOT_NOTARY_PROFILE`.
 2. `ditto -c -k --sequesterRsrc --keepParent HeyDot.app HeyDot-<version>.zip`
 3. `.build/artifacts/sparkle/Sparkle/bin/sign_update HeyDot-<version>.zip` prints the `sparkle:edSignature` and
    `length` attributes. It reads the private key from the maintainer's login keychain.
@@ -182,8 +187,8 @@ and its code signature matches the running app's.
    `sparkle:minimumSystemVersion` 14.0. Merging it to `main` offers the update to everyone.
 
 The private key was made once with Sparkle's `generate_keys` and lives only in the maintainer's keychain; back it
-up with `generate_keys -x <file>` to somewhere safe. HeyDot isn't signed with a Developer ID, so a lost key can't be
-replaced: existing installs would never accept another update and would need a manual download.
+up with `generate_keys -x <file>` to somewhere safe. Sparkle accepts a new EdDSA key only in an update signed with
+the same Developer ID as the installed app, and never both changed at once, so keep both.
 
 ## Clean uninstall
 

@@ -2,6 +2,7 @@
 # Assembly only; never installs, registers a login item or starts the app.
 # ./build-app.sh [debug|release] [--preview]
 # Release: export HEYDOT_APPROVED_CERT_SHA1 (40 hex) for an identity in `security find-identity -v -p codesigning`.
+# HEYDOT_NOTARY_PROFILE (a `notarytool store-credentials` profile) also timestamps, notarizes and staples the app.
 # --preview: an unsigned bundle for fixtures and screenshots only. Never ad-hoc signed, never distributed.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -96,12 +97,23 @@ strip "$APP/Contents/MacOS/HeyDot"
 otool -l "$APP/Contents/MacOS/HeyDot" | awk '/LC_RPATH/ {getline; getline; print $2}' | { grep "^$PWD/" || true; } | while read -r path; do
   install_name_tool -delete_rpath "$path" "$APP/Contents/MacOS/HeyDot"
 done
+# Notarization needs a secure timestamp; unnotarized local builds skip that network call.
+NOTARY="${HEYDOT_NOTARY_PROFILE:-}"
+TIMESTAMP=--timestamp=none
+[[ -z "$NOTARY" ]] || TIMESTAMP=--timestamp
 # Sparkle ships ad-hoc signed; its helpers are re-signed with the app's certificate, innermost first.
 for item in "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app" "$SPARKLE"; do
-  codesign --force --options runtime --timestamp=none --sign "$CERT" "$item"
+  codesign --force --options runtime "$TIMESTAMP" --sign "$CERT" "$item"
 done
-APP_REQ="identifier \"app.heydot.HeyDot\" and certificate leaf = H\"$CERT\""
-codesign --force --options runtime --timestamp=none --sign "$CERT" --requirements "=designated => $APP_REQ" \
-  --entitlements Resources/HeyDot.entitlements "$APP"
+# codesign's default designated requirement: the Team ID for an Apple-issued certificate, so it survives renewal.
+codesign --force --options runtime "$TIMESTAMP" --sign "$CERT" --entitlements Resources/HeyDot.entitlements "$APP"
 codesign --verify --strict --deep "$APP"
+if [[ -n "$NOTARY" ]]; then
+  UPLOAD="$(mktemp -d)"
+  trap 'rm -rf "$UPLOAD"' EXIT
+  ditto -c -k --keepParent "$APP" "$UPLOAD/HeyDot.zip"
+  xcrun notarytool submit "$UPLOAD/HeyDot.zip" --keychain-profile "$NOTARY" --wait
+  xcrun stapler staple "$APP"
+  spctl --assess --type execute -vv "$APP"
+fi
 echo "Signed assembly: $PWD/$APP. Not installed or registered."
