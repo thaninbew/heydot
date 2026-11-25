@@ -5,5 +5,14 @@
     <link>https://github.com/thaninbew/heydot</link>
     <description>HeyDot's update feed, read by Sparkle in the app. Each release adds one signed item; see docs/DEVELOPMENT.md.</description>
     <language>en</language>
+    <item>
+      <title>Version 0.2.0</title>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/thaninbew/heydot/releases/tag/v0.2.0</sparkle:releaseNotesLink>
+      <pubDate>Wed, 25 Nov 2026 02:49:54 +0000</pubDate>
+      <enclosure url="https://github.com/thaninbew/heydot/releases/download/v0.2.0/HeyDot-0.2.0.zip" sparkle:edSignature="L1dWGc1Eva+MkEKdwf/GOB2XEUbVAGS4yFP9xJsbrTjN6g5ZFnUQTY1Z6codqGIQAzR4hqhuLWTCjaJBnrzmDw==" length="13859242" type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
