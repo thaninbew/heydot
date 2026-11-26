@@ -128,6 +128,7 @@ public enum ControlCLI {
             return 2
         case .success(let parsed): command = parsed
         }
+        if command.verb != .status, !paths.allowsProfileAccess { return HeyDotMain.profileAccessError() }
         let request: JSONValue = switch command.verb {
         case .status: ["op": "status"]
         case .pause(let until): ["op": "pause", "until": until.map { .number($0.timeIntervalSince1970) } ?? .null]

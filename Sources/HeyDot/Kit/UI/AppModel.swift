@@ -90,6 +90,7 @@ public final class AppModel: ObservableObject {
     // MARK: Settings
 
     public func update(_ change: (inout AppSettings) -> Void) {
+        guard !stopped else { return }
         var next = settings
         change(&next)
         next.wake.phrase = next.phrase

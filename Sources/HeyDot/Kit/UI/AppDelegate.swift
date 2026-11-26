@@ -24,7 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        guard restoreProfile() else { NSApp.terminate(nil); return }
+        Task {
+            guard await finishPendingErase() else { NSApp.terminate(nil); return }
+            startProfile()
+        }
+    }
+
+    private func startProfile() {
         let store = SettingsStore(url: paths.settings)
         var settings = AppSettings()
         var loadError: String?
@@ -76,11 +82,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     }
 
     /// The new process holds the same lease. Finish the erase before starting any profile writers.
-    private func restoreProfile() -> Bool {
+    private func finishPendingErase() async -> Bool {
         let pending = PendingErase(paths: paths)
         while true {
             do {
-                return try pending.eraseIfPending() || !finishingErase
+                return try await pending.eraseIfPending() || !finishingErase
             } catch {
                 let alert = NSAlert()
                 alert.alertStyle = .warning
@@ -234,6 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
 
     private func eraseAndRestart() throws {
         guard !updates.isUpdating else { throw RestartError.updateInProgress }
+        try UninstallData.validateWebKitStore(paths: paths)
         guard let executable = Bundle.main.executableURL else { throw RestartError.executableMissing }
         let successor = Process()
         successor.executableURL = executable
@@ -243,7 +250,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             successor.terminate()
             throw error
         }
-        NSApp.terminate(nil)
+        onboarding?.shutDown()
+        troubleshooter?.stop()
+        control?.stop()
+        model.stop()
+        statusItem.button?.isEnabled = false
+        popover.performClose(nil)
+        windows.values.forEach { $0.orderOut(nil) }
+        Task {
+            await model.web.prepareForErase()
+            NSApp.terminate(nil)
+        }
     }
 
     private enum RestartError: LocalizedError {

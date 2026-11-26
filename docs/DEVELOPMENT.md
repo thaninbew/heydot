@@ -220,8 +220,11 @@ permission and the built-in browser's sign-in alone.
 
 Developer flags: `HeyDot --qa-signin DIR` renders the sign-in window over the live, logged-out chatgpt.com
 in a throwaway store; `HeyDot --qa-render DIR` renders every screen (light and dark) with fake engine and system hooks; `HeyDot --qa-boards DIR` renders the fit grids and logo board; `HeyDot --render-icon DIR`
-writes the 1024 px icon and iconset. `HEYDOT_HOME` redirects the app's files for isolated tests, uses a
-transient WebKit store, disables the updater, and skips native login-item, preference and keychain cleanup.
+writes the 1024 px icon and iconset. Only the installed `app.heydot.HeyDot` bundle can open the real profile.
+Set `HEYDOT_HOME` to an absolute disposable path before launching other builds or running commands that change profile data.
+An isolated build uses transient WebKit and skips native login-item, preference, keychain and updater actions.
+To test persistent WebKit, use a separate bundle ID and a fresh `HEYDOT_WEBKIT_STORE_ID` UUID, with `HOME`,
+`CFFIXED_USER_HOME` and `HEYDOT_HOME` all pointing to the same disposable directory.
 
 ## First run
 

@@ -1,7 +1,9 @@
+import AppKit
 import CoreFoundation
 import Foundation
 import Security
 import ServiceManagement
+import WebKit
 
 /// Clears the same local profile for a clean uninstall and for Erase and Start Over.
 enum UninstallData {
@@ -12,7 +14,8 @@ enum UninstallData {
             return status == .enabled || status == .requiresApproval
         }
         var removeLoginItem: () throws -> Void = { try SMAppService.mainApp.unregister() }
-        var bundleID = Bundle.main.bundleIdentifier ?? "app.heydot.HeyDot"
+        var bundleID: String?
+        var bundleURL = Bundle.main.bundleURL
     }
 
     struct RemovalError: LocalizedError {
@@ -22,19 +25,31 @@ enum UninstallData {
         var errorDescription: String? { "Couldn't remove \(item): \(cause.localizedDescription)" }
     }
 
+    private struct BundleInsideProfile: LocalizedError {
+        var errorDescription: String? { "Move HeyDot to Applications, then reopen it to finish erasing its data." }
+    }
+
+    struct ProfileAccessError: LocalizedError {
+        var errorDescription: String? { Paths.accessError }
+    }
+
     /// Call only while holding the app lease and before starting any profile writers.
-    static func erase(paths: Paths, hooks: Hooks = Hooks(), dryRun: Bool = false, keepLogs: Bool = false,
-                      out: (String) -> Void = { _ in }) throws {
-        let bundleID = hooks.bundleID
+    @MainActor static func erase(paths: Paths, hooks: Hooks = Hooks(), dryRun: Bool = false, keepLogs: Bool = false,
+                                 out: (String) -> Void = { _ in }) async throws {
+        let bundleID = hooks.bundleID ?? paths.bundleID
+        guard paths.allowsProfileAccess, paths.webStoreID == nil || bundleID == paths.bundleID else {
+            throw ProfileAccessError()
+        }
         guard bundleID.range(of: "^[a-zA-Z0-9][a-zA-Z0-9.-]*$", options: .regularExpression) != nil else {
             throw POSIXError(.EINVAL)
         }
         let library = paths.home.appendingPathComponent("Library", isDirectory: true)
+        let webKit = library.appendingPathComponent("WebKit/\(bundleID)", isDirectory: true)
         let prefs = library.appendingPathComponent("Preferences", isDirectory: true)
         let byHost = prefs.appendingPathComponent("ByHost", isDirectory: true)
         var targets = [
             paths.support,
-            library.appendingPathComponent("WebKit/\(bundleID)", isDirectory: true),
+            webKit,
             library.appendingPathComponent("Caches/\(bundleID)", isDirectory: true),
             library.appendingPathComponent("HTTPStorages/\(bundleID)", isDirectory: true),
             library.appendingPathComponent("HTTPStorages/\(bundleID).binarycookies"),
@@ -55,10 +70,14 @@ enum UninstallData {
                 }.map { byHost.appendingPathComponent($0) }
             }
         }
+        let bundlePath = hooks.bundleURL.resolvingSymlinksInPath().pathComponents
         var existing: [URL] = []
         for url in targets {
             if try removal(url.path, {
                 guard try paths.validateRemovalParents(of: url), let type = try Paths.itemType(at: url) else { return false }
+                if type == S_IFDIR, bundlePath.starts(with: url.resolvingSymlinksInPath().pathComponents) {
+                    throw BundleInsideProfile()
+                }
                 // cfprefsd can access these files by name; stop before calling it on a redirected plist.
                 if url.path.hasPrefix(prefs.path + "/"), type != S_IFREG { throw POSIXError(.EINVAL) }
                 return true
@@ -67,6 +86,14 @@ enum UninstallData {
 
         let verb = dryRun ? "Would remove" : "Removed"
         var removed = 0
+        if let storeID = paths.webStoreID, !dryRun {
+            do {
+                try validateWebKitStore(paths: paths)
+                try await removeWebKitStore(storeID)
+            } catch {
+                throw RemovalError(item: "HeyDot's browser data", cause: error)
+            }
+        }
         if paths.usesSystemData, hooks.loginItemEnabled() {
             if !dryRun { try removal("the login item", hooks.removeLoginItem) }
             out("\(verb) the login item (Open at login)")
@@ -94,6 +121,21 @@ enum UninstallData {
             }
         }
         if removed == 0 { out("Nothing to remove: HeyDot has no data on this Mac.") }
+    }
+
+    static func validateWebKitStore(paths: Paths) throws {
+        guard let storeID = paths.webStoreID else { return }
+        let library = paths.home.appendingPathComponent("Library", isDirectory: true)
+        // WebKit uses the process's actual Library, independent of HeyDot's file override.
+        guard FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first?.resolvingSymlinksInPath().pathComponents
+            == library.resolvingSymlinksInPath().pathComponents else { throw ProfileAccessError() }
+        let parent = library.appendingPathComponent("WebKit/\(paths.bundleID)/WebsiteDataStore", isDirectory: true)
+        for name in [storeID.uuidString, storeID.uuidString.lowercased()] {
+            let store = parent.appendingPathComponent(name, isDirectory: true)
+            if try paths.validateRemovalParents(of: store), let type = try Paths.itemType(at: store), type != S_IFDIR {
+                throw POSIXError(.EINVAL)
+            }
+        }
     }
 
     /// WebKit uses a local generic password keyed by this exact app-specific account.
@@ -133,8 +175,9 @@ enum UninstallData {
         do { return try work() } catch { throw RemovalError(item: item, cause: error) }
     }
 
-    static func run(arguments: [String], paths: Paths = Paths(), hooks: Hooks = Hooks(),
-                    out: (String) -> Void = { print($0) }, err: (String) -> Void = { FileHandle.standardError.write(Data(($0 + "\n").utf8)) }) -> Int32 {
+    @MainActor static func run(arguments: [String], paths: Paths = Paths(), hooks: Hooks = Hooks(),
+                                out: (String) -> Void = { print($0) }, err: (String) -> Void = { FileHandle.standardError.write(Data(($0 + "\n").utf8)) }) async -> Int32 {
+        guard paths.allowsProfileAccess else { err("HeyDot: \(Paths.accessError)"); return 1 }
         let dry = arguments.contains("--dry-run"), keepLogs = arguments.contains("--keep-logs")
         let lease: LifecycleLease
         do { lease = try LifecycleLease(paths: paths, role: "app") }
@@ -145,15 +188,27 @@ enum UninstallData {
             return 1
         }
         do {
-            try erase(paths: paths, hooks: hooks, dryRun: dry, keepLogs: keepLogs, out: out)
+            try await erase(paths: paths, hooks: hooks, dryRun: dry, keepLogs: keepLogs, out: out)
             if !dry { try PendingErase(paths: paths).finishIfPending() }
         } catch {
             err("HeyDot: \(error.localizedDescription)")
             return 1
         }
         out(keepLogs && FileManager.default.fileExists(atPath: paths.log.path) ? "Kept the log at \(paths.log.path) (--keep-logs)." : "Kept nothing.")
-        out("macOS still remembers the microphone permission. To reset it too: tccutil reset Microphone \(hooks.bundleID)")
+        if paths.usesSystemData {
+            out("macOS still remembers the microphone permission. To reset it too: tccutil reset Microphone \(paths.bundleID)")
+        }
         return 0
+    }
+
+    @MainActor private static func removeWebKitStore(_ storeID: UUID) async throws {
+        // The static removal API can reach WebKit's run loop before it initializes in a fresh process.
+        _ = NSApplication.shared
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let bootstrap = WKWebView(frame: .zero, configuration: configuration)
+        defer { withExtendedLifetime(bootstrap) {} }
+        try await WKWebsiteDataStore.remove(forIdentifier: storeID)
     }
 }
 
