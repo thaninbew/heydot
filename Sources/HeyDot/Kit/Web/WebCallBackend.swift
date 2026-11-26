@@ -35,6 +35,7 @@ public protocol WebCalling: AnyObject {
     func pageState() async -> WebPageState
     func showSignIn(onClose: @escaping () -> Void)
     func signOut() async
+    func prepareForErase() async
     /// Drops the hidden page and anything still waiting on it (a hung press, a stale page), so the next
     /// call or warm starts from a fresh load. Ends a running call.
     func reset()
@@ -44,6 +45,7 @@ public extension WebCalling {
     var microphoneMuted: Bool? { nil }
     func setMicrophoneMuted(_ muted: Bool) async -> Bool { false }
     func reset() {}
+    func prepareForErase() async { reset() }
 }
 
 /// No built-in browser (tests and fixtures that don't exercise it).
@@ -76,12 +78,11 @@ public final class NoWeb: WebCalling {
 ///   the page's microphone capture ends.
 @MainActor
 public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, WKUIDelegate, NSWindowDelegate {
-    /// Fixed, so the same signed-in store is found on every launch.
-    static let storeID = UUID(uuidString: "6E8F2C4A-3B1D-4F5E-9A7C-2D1E0B4C8F61")!
     static let label = "Start call"
 
     let log: Log
     private let store: WKWebsiteDataStore
+    private let paths: Paths
     private var panel: NSPanel?
     private var webView: WKWebView?
     private var signInWindow: NSWindow?
@@ -94,13 +95,15 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     private var captureWatch: NSKeyValueObservation?
     private var callTimeout: Task<Void, Never>?
     private var micWasOn = false
+    private var erasing = false
     public private(set) var inCall = false
     public var onCallChange: ((String?) -> Void)?
 
-    /// `store` nil is the persistent sign-in store; QA renders pass `.nonPersistent()`.
-    public init(log: Log = .shared, store: WKWebsiteDataStore? = nil) {
+    /// A redirected profile uses a transient store unless it supplies a separate fixture store.
+    public init(log: Log = .shared, store: WKWebsiteDataStore? = nil, paths: Paths = Paths()) {
         self.log = log
-        self.store = store ?? WKWebsiteDataStore(forIdentifier: Self.storeID)
+        self.paths = paths
+        self.store = store ?? paths.webStoreID.map { WKWebsiteDataStore(forIdentifier: $0) } ?? .nonPersistent()
         super.init()
     }
 
@@ -131,6 +134,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         webView?.stopLoading()
         webView?.navigationDelegate = nil
         webView?.uiDelegate = nil
+        if erasing { webView?.loadHTMLString("", baseURL: nil) }
         panel?.orderOut(nil)
         panel?.contentView = nil
         panel?.close()
@@ -195,7 +199,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     }
 
     public func warm(dotURL: String?) {
-        guard let dotURL, let url = URL(string: dotURL), url.host == "chatgpt.com" else { return }
+        guard !erasing, let dotURL, let url = URL(string: dotURL), url.host == "chatgpt.com" else { return }
         guard !inCall, !placing, !isShowing(url) || loadError != nil else { return }
         log.write("web: warming \(url.path)")
         load(url)
@@ -242,6 +246,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     // MARK: Calls
 
     public func call(dotURL: String, wakeAt: Date) async -> CallResult {
+        guard !erasing else { return CallResult(outcome: "cancelled") }
         guard let target = URL(string: dotURL), target.host == "chatgpt.com" else { return CallResult(outcome: "no-dot") }
         guard !inCall, !placing else { return CallResult(outcome: "disabled", message: Self.describe("in-call")) }
         placing = true; micWasOn = false
@@ -285,6 +290,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     }
 
     public func check(dotURL: String) async -> CallResult {
+        guard !erasing else { return CallResult(outcome: "cancelled") }
         guard let target = URL(string: dotURL), target.host == "chatgpt.com" else { return CallResult(outcome: "no-dot") }
         if inCall || placing { return CallResult(outcome: "disabled", message: Self.describe("in-call")) }
         pageReaders += 1
@@ -387,6 +393,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     // MARK: Sign-in
 
     public func pageState() async -> WebPageState {
+        guard !erasing else { return WebPageState(signedIn: nil) }
         pageReaders += 1
         defer { pageReaders -= 1; scheduleIdleUnload() }
         let view: WKWebView
@@ -396,6 +403,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
             let deadline = Date().addingTimeInterval(10)
             while view.isLoading && Date() < deadline && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(200)) }
         }
+        guard !erasing else { return WebPageState(signedIn: nil) }
         let r = await run(PageScripts.state, in: view)
         guard r["ready"] as? Bool == true else { return WebPageState(signedIn: nil) }
         let dots = (r["dots"] as? [[String: Any]] ?? []).compactMap { d -> DotTab? in
@@ -408,6 +416,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     /// A normal visible window on chatgpt.com, sharing the persistent store. The user signs in however
     /// chatgpt.com offers (Google, Apple, email, phone). WebKit's own user agent is left unchanged.
     public func showSignIn(onClose: @escaping () -> Void) {
+        guard !erasing else { return }
         signInClosed = onClose
         if let signInWindow {
             NSApp.activate(ignoringOtherApps: true)
@@ -455,10 +464,34 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     }
 
     public func signOut() async {
+        guard !erasing else { return }
         if inCall { endCall() }
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         log.write("web: signed out (cleared HeyDot's web data)")
         if let url = webView?.url { load(url) }
+    }
+
+    public func prepareForErase() async {
+        erasing = true
+        reset()
+        signInClosed = nil
+        signInWindow?.delegate = nil
+        if let window = signInWindow { discardSignInWindow(window, view: signInView) }
+        signInWindow = nil; signInView = nil
+        for popup in popups { discardSignInWindow(popup, view: popup.contentView as? WKWebView) }
+        popups = []
+        // Let the outgoing network process acknowledge deletion of its live session data before quitting.
+        await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
+    }
+
+    private func discardSignInWindow(_ window: NSWindow, view: WKWebView?) {
+        view?.navigationDelegate = nil
+        view?.uiDelegate = nil
+        view?.stopLoading()
+        view?.loadHTMLString("", baseURL: nil)
+        window.close()
+        window.contentViewController = nil
+        window.contentView = nil
     }
 
     /// Website data HeyDot keeps: ChatGPT's own sites. WebKit groups records by registrable domain.
@@ -514,7 +547,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     @objc(_webCryptoMasterKeyForWebView:completionHandler:)
     public func webCryptoMasterKey(for webView: WKWebView, completionHandler: @escaping (Data?) -> Void) {
         if cryptoKey == nil {
-            let key = WebCryptoKey.load()
+            let key = store.isPersistent ? WebCryptoKey.load(paths: paths) : WebCryptoKey.generate()
             cryptoKey = .some(key)
             log.write(key == nil ? "web: couldn't keep a WebCrypto key; WebKit uses the keychain" : "web: supplied the WebCrypto key")
         }

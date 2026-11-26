@@ -26,33 +26,51 @@ public enum HeyDotMain {
             }
         }
         if arguments.contains("--reset-onboarding") { return resetOnboarding() }
-        if arguments.contains("--uninstall-data") { return UninstallData.run(arguments: arguments) }
+        if arguments.contains("--uninstall-data") { return uninstallData(arguments: arguments) }
         if let i = arguments.firstIndex(of: "--qa-signin"), i + 1 < arguments.count {
             return QARender.renderSignIn(into: URL(fileURLWithPath: arguments[i + 1]))
         }
         if let i = arguments.firstIndex(of: "--render-icon"), i + 1 < arguments.count {
             return QARender.renderIcon(into: URL(fileURLWithPath: arguments[i + 1]))
         }
+        let paths = Paths()
+        guard paths.allowsProfileAccess else { return profileAccessError() }
+        let finishingErase = arguments.dropFirst().first == PendingErase.relaunchArgument
         let lease: LifecycleLease
-        do { lease = try LifecycleLease(paths: Paths(), role: "app") }
+        do { lease = try LifecycleLease(paths: paths, role: "app", waitForQuit: finishingErase) }
         catch { return 1 }
         defer { withExtendedLifetime(lease) {} }
         // LaunchServices normally coalesces launches, but direct executable launches need the lease too.
-        if ProcessInfo.processInfo.environment["HEYDOT_HOME"] == nil,
-           NSRunningApplication.runningApplications(withBundleIdentifier: "app.heydot.HeyDot")
-            .contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) { return 1 }
-        guard !ControlSocket.isHelperRunning(socket: Paths().controlSocket) else { return 1 }
+        if !finishingErase, paths.usesSystemData,
+           NSRunningApplication.runningApplications(withBundleIdentifier: Paths.appBundleID)
+            .contains(where: { !$0.isTerminated && $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) { return 1 }
+        guard !ControlSocket.isHelperRunning(socket: paths.controlSocket) else { return 1 }
         let app = NSApplication.shared
-        let delegate = AppDelegate()
+        let delegate = AppDelegate(paths: paths, finishingErase: finishingErase)
         app.delegate = delegate
         app.setActivationPolicy(.accessory)
         app.run()
         return 0
     }
 
+    @MainActor
+    private static func uninstallData(arguments: [String]) -> Int32 {
+        // A CLI launch has no AppKit run loop. Keep WebKit's main-thread completion running without opening UI.
+        var result: Int32?
+        Task { result = await UninstallData.run(arguments: arguments) }
+        while result == nil { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        return result!
+    }
+
+    static func profileAccessError() -> Int32 {
+        FileHandle.standardError.write(Data("HeyDot: \(Paths.accessError)\n".utf8))
+        return 1
+    }
+
     /// Refuses while the app runs (it would write the file straight back). Login item,
     /// microphone permission and the built-in browser's sign-in are left as they are.
     static func resetOnboarding(paths: Paths = Paths(), running: (URL) -> Bool = { ControlSocket.isHelperRunning(socket: $0) }) -> Int32 {
+        guard paths.allowsProfileAccess else { return profileAccessError() }
         let leases: [LifecycleLease]
         do { leases = try [LifecycleLease(paths: paths, role: "app")] }
         catch {

@@ -53,13 +53,13 @@ final class LockedBox<T>: @unchecked Sendable {
     #expect(ProcessInfo.processInfo.systemUptime - start < 0.25)
 }
 
-@Test func lifecycleLeaseExcludesDuplicatesAndMaintenance() throws {
+@MainActor @Test func lifecycleLeaseExcludesDuplicatesAndMaintenance() async throws {
     let root = try shortTempDir()
     defer { try? FileManager.default.removeItem(at: root) }
     let paths = Paths(home: root)
     var lease: LifecycleLease? = try LifecycleLease(paths: paths, role: "app")
     #expect(throws: POSIXError.self) { try LifecycleLease(paths: paths, role: "app") }
-    #expect(UninstallData.run(arguments: ["HeyDot", "--uninstall-data"], paths: paths, out: { _ in }, err: { _ in }) == 1)
+    #expect(await UninstallData.run(arguments: ["HeyDot", "--uninstall-data"], paths: paths, out: { _ in }, err: { _ in }) == 1)
     withExtendedLifetime(lease) {}
     lease = nil
     let second = try LifecycleLease(paths: paths, role: "app")

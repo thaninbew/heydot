@@ -17,10 +17,7 @@ enum WebCryptoKey {
     static func load(paths: Paths = Paths()) -> Data? {
         let url = url(paths)
         if let data = try? Data(contentsOf: url), data.count == size { return data }
-        var key = Data(count: size)
-        guard key.withUnsafeMutableBytes({ SecRandomCopyBytes(kSecRandomDefault, size, $0.baseAddress!) }) == errSecSuccess else {
-            return nil
-        }
+        guard let key = generate() else { return nil }
         do {
             try Paths.ensureDirectory(paths.support, mode: 0o700)
             try key.write(to: url, options: .atomic)
@@ -29,5 +26,11 @@ enum WebCryptoKey {
         } catch {
             return nil
         }
+    }
+
+    static func generate() -> Data? {
+        var key = Data(count: size)
+        let status = key.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, size, $0.baseAddress!) }
+        return status == errSecSuccess ? key : nil
     }
 }

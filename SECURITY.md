@@ -30,7 +30,7 @@ listener reads the microphone continuously but keeps only a short rolling buffer
 built-in microphone unless you choose another in Settings, never switches to headphones on its own, and lets go
 of the microphone while the display is off, the Mac sleeps or the screen is locked.
 
-`HeyDot --uninstall-data` removes all of the above (see [Development](docs/DEVELOPMENT.md)).
+**Erase and Start Over** in Settings and `HeyDot --uninstall-data` clear the local profile, including any app-specific WebCrypto keychain item. macOS retains the app's microphone permission. See [Development](docs/DEVELOPMENT.md).
 
 ## The rules HeyDot follows
 

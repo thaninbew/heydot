@@ -7,8 +7,8 @@ struct SettingsView: View {
     /// The app passes its one updater; QA renders and tests get an inert one (no feed URL outside a built app).
     @ObservedObject var updates = Updates()
     var retune: () -> Void
-    var rerunSetup: () -> Void
     var openDotMaker: () -> Void
+    var eraseAndRestart: () throws -> Void
     @State private var nameDraft = ""
     @State private var nameError: String?
     @State private var phraseDraft = ""
@@ -18,6 +18,8 @@ struct SettingsView: View {
     @State private var loginError: String?
     @State private var devices: [AudioInput] = []
     @State private var checking = false
+    @State private var confirmingErase = false
+    @State private var eraseError: String?
     static let minimumHeight: CGFloat = 360
 
     var body: some View {
@@ -137,6 +139,13 @@ struct SettingsView: View {
             }
             Section("Privacy") {
                 PrivacyNote(phrase: model.settings.phrase, viewer: "settings")
+                LabeledContent {
+                    Button("Erase and Start Over\u{2026}", role: .destructive) { confirmingErase = true }
+                } label: {
+                    Text("Local data")
+                    Text("Clear HeyDot's data on this Mac and return to setup.")
+                }
+                if let eraseError { Text(eraseError).foregroundStyle(.red).font(.callout) }
             }
             Section {
                 HStack {
@@ -144,7 +153,6 @@ struct SettingsView: View {
                     Button("HeyDot on GitHub") { model.hooks.openURL(AppModel.repository) }
                         .help("Source code, releases and issues. A star helps other people find HeyDot.")
                     Spacer()
-                    Button("Run setup again\u{2026}", action: rerunSetup)
                 }
             }
             if let error = model.settingsError {
@@ -161,6 +169,14 @@ struct SettingsView: View {
         .frame(width: 560)
         .frame(minHeight: SettingsView.minimumHeight, idealHeight: 680, maxHeight: .infinity)
         .frostAccent(model.settings.design)
+        .alert("Erase HeyDot's local data?", isPresented: $confirmingErase) {
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+            Button("Erase and Start Over", role: .destructive) {
+                do { try eraseAndRestart() } catch { eraseError = error.localizedDescription }
+            }
+        } message: {
+            Text("This permanently clears your settings, voice tuning, avatars, logs and HeyDot's ChatGPT sign-in. Open at login will be turned off and setup will start from Welcome.")
+        }
         .onAppear {
             nameDraft = model.settings.dotName
             phraseDraft = Phrase.title(model.settings.phrase)
