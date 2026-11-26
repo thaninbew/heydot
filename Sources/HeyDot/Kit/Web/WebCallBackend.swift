@@ -82,6 +82,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     let log: Log
     private let store: WKWebsiteDataStore
+    private let paths: Paths
     private var panel: NSPanel?
     private var webView: WKWebView?
     private var signInWindow: NSWindow?
@@ -97,10 +98,11 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     public private(set) var inCall = false
     public var onCallChange: ((String?) -> Void)?
 
-    /// `store` nil is the persistent sign-in store; QA renders pass `.nonPersistent()`.
-    public init(log: Log = .shared, store: WKWebsiteDataStore? = nil) {
+    /// A redirected profile uses a transient store so it never shares the installed app's session.
+    public init(log: Log = .shared, store: WKWebsiteDataStore? = nil, paths: Paths = Paths()) {
         self.log = log
-        self.store = store ?? WKWebsiteDataStore(forIdentifier: Self.storeID)
+        self.paths = paths
+        self.store = store ?? (paths.usesSystemData ? WKWebsiteDataStore(forIdentifier: Self.storeID) : .nonPersistent())
         super.init()
     }
 
@@ -514,7 +516,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     @objc(_webCryptoMasterKeyForWebView:completionHandler:)
     public func webCryptoMasterKey(for webView: WKWebView, completionHandler: @escaping (Data?) -> Void) {
         if cryptoKey == nil {
-            let key = WebCryptoKey.load()
+            let key = store.isPersistent ? WebCryptoKey.load(paths: paths) : WebCryptoKey.generate()
             cryptoKey = .some(key)
             log.write(key == nil ? "web: couldn't keep a WebCrypto key; WebKit uses the keychain" : "web: supplied the WebCrypto key")
         }

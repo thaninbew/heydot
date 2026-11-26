@@ -13,9 +13,10 @@ public struct SystemHooks {
     public var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
 
     @MainActor
-    public static func live() -> SystemHooks {
+    public static func live(paths: Paths = Paths()) -> SystemHooks {
         return SystemHooks(
             setLaunchAtLogin: { on in
+                guard paths.usesSystemData else { return }
                 if on {
                     guard SMAppService.mainApp.status != .enabled,
                           SMAppService.mainApp.status != .requiresApproval else { return }
@@ -24,7 +25,7 @@ public struct SystemHooks {
                     try SMAppService.mainApp.unregister()
                 }
             },
-            launchAtLoginEnabled: { SMAppService.mainApp.status == .enabled },
+            launchAtLoginEnabled: { paths.usesSystemData && SMAppService.mainApp.status == .enabled },
             microphoneStatus: { AVCaptureDevice.authorizationStatus(for: .audio) },
             requestMicrophone: { done in AVCaptureDevice.requestAccess(for: .audio, completionHandler: done) }
         )

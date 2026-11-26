@@ -86,6 +86,8 @@ Any code-signing identity from `security find-identity -v -p codesigning` works,
 
 ## Uninstall
 
+To clear your local data and keep using HeyDot, choose **Settings → Privacy → Erase and Start Over**. HeyDot reopens at Welcome with its ChatGPT sign-in cleared and Open at login off.
+
 Quit HeyDot, then:
 
 ```sh

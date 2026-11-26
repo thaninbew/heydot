@@ -191,7 +191,12 @@ The private key was made once with Sparkle's `generate_keys` and lives only in t
 up with `generate_keys -x <file>` to somewhere safe. Sparkle accepts a new EdDSA key only in an update signed with
 the same Developer ID as the installed app, and never both changed at once, so keep both.
 
-## Clean uninstall
+## Erase local data
+
+**Settings → Privacy → Erase and Start Over** clears the local profile and reopens HeyDot at Welcome.
+It uses the same cleanup as `--uninstall-data`.
+
+### Clean uninstall
 
 Quit HeyDot, then:
 
@@ -215,7 +220,8 @@ permission and the built-in browser's sign-in alone.
 
 Developer flags: `HeyDot --qa-signin DIR` renders the sign-in window over the live, logged-out chatgpt.com
 in a throwaway store; `HeyDot --qa-render DIR` renders every screen (light and dark) with fake engine and system hooks; `HeyDot --qa-boards DIR` renders the fit grids and logo board; `HeyDot --render-icon DIR`
-writes the 1024 px icon and iconset. `HEYDOT_HOME` redirects all paths for isolated tests.
+writes the 1024 px icon and iconset. `HEYDOT_HOME` redirects the app's files for isolated tests, uses a
+transient WebKit store, disables the updater, and skips native login-item, preference and keychain cleanup.
 
 ## First run
 

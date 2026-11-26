@@ -229,10 +229,10 @@ enum QARender {
             try snapshot(DotMakerView(draft: DotDesign(shape: .circleTwoEars, color: .pink, eyes: .roundHighlights, glasses: .roundSunglasses,
                                                        accessory: .beret, accessoryColor: .brown, nickname: "Mochi"),
                                       onSave: { _, _ in }, onCancel: {}), to: out("dotmaker-mochi-dark"), dark: true, size: CGSize(width: 900, height: 680))
-            try both("settings") { SettingsView(model: model { $0.menuBarIcon = .color }, retune: {}, rerunSetup: {}, openDotMaker: {}) }
+            try both("settings") { SettingsView(model: model { $0.menuBarIcon = .color }, retune: {}, openDotMaker: {}, eraseAndRestart: {}) }
             // The smallest Settings window: the form must scroll to reach the sections below the fold.
             try both("settings-smallest", size: CGSize(width: 560, height: SettingsView.minimumHeight)) {
-                SettingsView(model: model(), retune: {}, rerunSetup: {}, openDotMaker: {})
+                SettingsView(model: model(), retune: {}, openDotMaker: {}, eraseAndRestart: {})
             }
 
             // The dot-derived accent for three very different dot colours: the lime example (lime), a pale yellow
@@ -260,10 +260,10 @@ enum QARender {
                 try both("theme-\(name)-popover") { popover(model { $0.design = design }) }
             }
             try both("theme-board") { ThemeBoard() }
-            try both("settings-monochrome") { SettingsView(model: model(), retune: {}, rerunSetup: {}, openDotMaker: {}) }
+            try both("settings-monochrome") { SettingsView(model: model(), retune: {}, openDotMaker: {}, eraseAndRestart: {}) }
             try both("settings-custom-wake-paused") {
                 SettingsView(model: model { $0.setWakePhrase("okay tray"); $0.paused = true; $0.pausedUntil = Date().addingTimeInterval(2 * 3600 + 5 * 60)
-                    $0.morningMinutes = 7 * 60 + 30 }, retune: {}, rerunSetup: {}, openDotMaker: {})
+                    $0.morningMinutes = 7 * 60 + 30 }, retune: {}, openDotMaker: {}, eraseAndRestart: {})
             }
 
             // Menu bar glyphs at 18 pt (2x): monochrome and colour, on light and dark bars

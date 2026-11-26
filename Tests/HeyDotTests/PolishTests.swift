@@ -160,3 +160,67 @@ private func tempDir() throws -> URL {
     hooks.running = { _ in true }
     #expect(UninstallData.run(arguments: [], paths: paths, hooks: hooks, out: { _ in }, err: { _ in }) == 1)
 }
+
+@Test func confirmedEraseRemovesProfileAndCanBeRetried() throws {
+    let home = try tempDir()
+    defer { try? FileManager.default.removeItem(at: home) }
+    let paths = Paths(home: home)
+    let pending = PendingErase(paths: paths)
+    let store = SettingsStore(url: paths.settings)
+    var settings = AppSettings()
+    settings.rename("Tray")
+    settings.onboarded = true
+    try store.save(settings)
+    let fm = FileManager.default
+    let bundleID = Bundle.main.bundleIdentifier ?? "app.heydot.HeyDot"
+    let owned = [
+        paths.support.appendingPathComponent("settings.json.reset-20260101"),
+        paths.support.appendingPathComponent("avatars/avatar.png"),
+        paths.support.appendingPathComponent("run/old.sock"),
+        WebCryptoKey.url(paths),
+        paths.log,
+        URL(fileURLWithPath: paths.log.path + ".1"),
+        home.appendingPathComponent("Library/WebKit/\(bundleID)/WebsiteDataStore/session"),
+        home.appendingPathComponent("Library/Caches/\(bundleID)/org.sparkle-project.Sparkle/update"),
+        home.appendingPathComponent("Library/HTTPStorages/\(bundleID).binarycookies"),
+        home.appendingPathComponent("Library/Preferences/\(bundleID).plist"),
+        home.appendingPathComponent("Library/Preferences/ByHost/\(bundleID).\(UUID().uuidString).plist"),
+        home.appendingPathComponent("Library/Saved Application State/\(bundleID).savedState/window"),
+    ]
+    let preserved = [
+        home.appendingPathComponent("Applications/HeyDot.app/Contents/MacOS/HeyDot"),
+        home.appendingPathComponent("Library/WebKit/OtherApp/session"),
+        home.appendingPathComponent("Library/Preferences/\(bundleID).other.plist"),
+        home.appendingPathComponent("Library/Logs/OtherApp.log"),
+    ]
+    for url in owned + preserved {
+        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("fixture".utf8).write(to: url)
+    }
+    let link = paths.support.appendingPathComponent("external")
+    try fm.createSymbolicLink(at: link, withDestinationURL: preserved[0])
+
+    #expect(try !pending.eraseIfPending())
+    #expect(try store.load() == settings)
+    #expect(owned.allSatisfy { fm.fileExists(atPath: $0.path) })
+    try pending.request()
+    #expect(throws: POSIXError.self) { try pending.request() }
+
+    let caches = home.appendingPathComponent("Library/Caches", isDirectory: true)
+    let external = home.appendingPathComponent("another-library", isDirectory: true)
+    try fm.moveItem(at: caches, to: external)
+    try fm.createSymbolicLink(at: caches, withDestinationURL: external)
+    #expect(throws: UninstallData.RemovalError.self) { try pending.eraseIfPending() }
+    #expect(try pending.isPending())
+    #expect(try store.load() == settings)
+    #expect(owned.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+    try fm.removeItem(at: caches)
+    try fm.moveItem(at: external, to: caches)
+    #expect(try pending.eraseIfPending())
+    #expect(try store.load() == AppSettings())
+    #expect(owned.allSatisfy { !fm.fileExists(atPath: $0.path) })
+    #expect(preserved.allSatisfy { fm.fileExists(atPath: $0.path) })
+    #expect(try !pending.isPending())
+    #expect(try !pending.eraseIfPending())
+}

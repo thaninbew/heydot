@@ -5,6 +5,8 @@ import WakeEngine
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
+    private let paths: Paths
+    private let finishingErase: Bool
     private var model: AppModel!
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
@@ -16,8 +18,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private var control: ControlService?
     private var updates: Updates!
 
+    init(paths: Paths, finishingErase: Bool) {
+        self.paths = paths
+        self.finishingErase = finishingErase
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let store = SettingsStore()
+        guard restoreProfile() else { NSApp.terminate(nil); return }
+        let store = SettingsStore(url: paths.settings)
         var settings = AppSettings()
         var loadError: String?
         do { settings = try store.load() } catch {
@@ -25,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             Log.shared.write("settings: \(error)")
         }
         model = AppModel(settings: settings, engine: WakeEngine(log: { Log.shared.write($0) }), enroller: Enroller(),
-                         web: WebCallBackend(), hooks: .live(), store: loadError == nil ? store : nil)
+                         web: WebCallBackend(paths: paths), hooks: .live(paths: paths), store: loadError == nil ? store : nil)
         model.settingsError = loadError
         updates = Updates()
         Log.shared.write("app: started, version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
@@ -54,9 +62,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         }
         updateGlyph()
         model.refreshListening()
-        model.warmWeb()
+        if paths.usesSystemData { model.warmWeb() }
         model.startKeepAlive()
-        do { control = try ControlService(model: model) } catch { Log.shared.write("control: \(error)") }
+        do { control = try ControlService(model: model, paths: paths) } catch { Log.shared.write("control: \(error)") }
         if !model.settings.onboarded { showOnboarding() }
     }
 
@@ -64,7 +72,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     /// as each step commits, and setup isn't marked done, so the next launch opens setup again.
     func applicationWillTerminate(_ notification: Notification) {
         onboarding?.shutDown()
-        control?.stop(); model.stop()
+        control?.stop(); model?.stop()
+    }
+
+    /// The new process holds the same lease. Finish the erase before starting any profile writers.
+    private func restoreProfile() -> Bool {
+        let pending = PendingErase(paths: paths)
+        while true {
+            do {
+                return try pending.eraseIfPending() || !finishingErase
+            } catch {
+                let alert = NSAlert()
+                alert.alertStyle = .warning
+                alert.messageText = "HeyDot couldn't finish erasing its data"
+                alert.informativeText = error.localizedDescription
+                alert.addButton(withTitle: "Try Again")
+                alert.addButton(withTitle: "Quit HeyDot")
+                alert.window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                guard alert.runModal() == .alertFirstButtonReturn else { return false }
+            }
+        }
     }
 
     func popoverDidClose(_ notification: Notification) {
@@ -200,8 +228,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         present("settings", title: "HeyDot Settings", view: SettingsView(
             model: model, updates: updates,
             retune: { [weak self] in self?.showOnboarding(startAt: .voice) },
-            rerunSetup: { [weak self] in self?.showOnboarding() },
-            openDotMaker: { [weak self] in self?.showDotMaker() }), resizable: true, frosted: true)
+            openDotMaker: { [weak self] in self?.showDotMaker() },
+            eraseAndRestart: { [weak self] in try self?.eraseAndRestart() }), resizable: true, frosted: true)
+    }
+
+    private func eraseAndRestart() throws {
+        guard !updates.isUpdating else { throw RestartError.updateInProgress }
+        guard let executable = Bundle.main.executableURL else { throw RestartError.executableMissing }
+        let successor = Process()
+        successor.executableURL = executable
+        successor.arguments = [PendingErase.relaunchArgument]
+        try successor.run()
+        do { try PendingErase(paths: paths).request() } catch {
+            successor.terminate()
+            throw error
+        }
+        NSApp.terminate(nil)
+    }
+
+    private enum RestartError: LocalizedError {
+        case executableMissing, updateInProgress
+
+        var errorDescription: String? {
+            switch self {
+            case .executableMissing: "HeyDot couldn't find its executable to reopen setup."
+            case .updateInProgress: "Finish updating HeyDot, then try again. If an update is waiting to install, quit and reopen HeyDot first."
+            }
+        }
     }
 
 }

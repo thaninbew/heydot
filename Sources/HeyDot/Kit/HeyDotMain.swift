@@ -33,17 +33,19 @@ public enum HeyDotMain {
         if let i = arguments.firstIndex(of: "--render-icon"), i + 1 < arguments.count {
             return QARender.renderIcon(into: URL(fileURLWithPath: arguments[i + 1]))
         }
+        let paths = Paths()
+        let finishingErase = arguments.dropFirst().first == PendingErase.relaunchArgument
         let lease: LifecycleLease
-        do { lease = try LifecycleLease(paths: Paths(), role: "app") }
+        do { lease = try LifecycleLease(paths: paths, role: "app", waitForQuit: finishingErase) }
         catch { return 1 }
         defer { withExtendedLifetime(lease) {} }
         // LaunchServices normally coalesces launches, but direct executable launches need the lease too.
-        if ProcessInfo.processInfo.environment["HEYDOT_HOME"] == nil,
+        if !finishingErase, paths.usesSystemData,
            NSRunningApplication.runningApplications(withBundleIdentifier: "app.heydot.HeyDot")
-            .contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) { return 1 }
-        guard !ControlSocket.isHelperRunning(socket: Paths().controlSocket) else { return 1 }
+            .contains(where: { !$0.isTerminated && $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) { return 1 }
+        guard !ControlSocket.isHelperRunning(socket: paths.controlSocket) else { return 1 }
         let app = NSApplication.shared
-        let delegate = AppDelegate()
+        let delegate = AppDelegate(paths: paths, finishingErase: finishingErase)
         app.delegate = delegate
         app.setActivationPolicy(.accessory)
         app.run()

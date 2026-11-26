@@ -212,7 +212,7 @@ final class RecordingTuner: VoiceTuner {
 
 @MainActor @Test func settingsScrollsAtItsSmallestWindowSize() async throws {
     _ = NSApplication.shared
-    let host = NSHostingView(rootView: SettingsView(model: QARender.model(), retune: {}, rerunSetup: {}, openDotMaker: {})
+    let host = NSHostingView(rootView: SettingsView(model: QARender.model(), retune: {}, openDotMaker: {}, eraseAndRestart: {})
         .frame(width: 560, height: SettingsView.minimumHeight))
     let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: 560, height: SettingsView.minimumHeight),
                           styleMask: [.titled, .resizable], backing: .buffered, defer: false)
