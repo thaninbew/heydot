@@ -209,3 +209,66 @@ import WebKit
         if let back = buttons.first(where: { $0.label == "Back" }) { #expect(back.frame.size == CGSize(width: 46, height: 46)) }
     }
 }
+
+/// Holds each calibration until the test finishes it.
+final class GatedEnroller: WakeEnrolling, @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiting: [CheckedContinuation<Calibration, Error>] = []
+    var pending: Int { lock.withLock { waiting.count } }
+    func calibrate(phrase: String, positives: [Clip], negatives: [Clip]) async throws -> Calibration {
+        try await withCheckedThrowingContinuation { c in lock.withLock { waiting.append(c) } }
+    }
+    func finish(_ settings: WakeSettings) {
+        lock.withLock { waiting.removeFirst() }.resume(returning: Calibration(settings: settings, caught: 4, falseHits: 0, note: "tuned"))
+    }
+}
+
+/// A calibration still running when its flow is left (setup closed or reopened) or the wake phrase changes in
+/// Settings saves nothing; one that is still current saves its tuning.
+@MainActor @Test func staleCalibrationNeverSavesTuning() async throws {
+    let enroller = GatedEnroller()
+    var settings = AppSettings()
+    settings.rename("Tray")
+    let app = AppModel(settings: settings, engine: FakeEngine(), enroller: enroller, hooks: QARender.fakeHooks(), store: nil,
+                       log: Log(url: URL(fileURLWithPath: "/dev/null")))
+    let tuned = WakeSettings(phrase: "hey tray", threshold: 0.2, learned: ["▁HE Y ▁TRA Y"])
+    func calibrating(_ change: (OnboardingModel) -> Void) async throws -> OnboardingModel {
+        let flow = OnboardingModel(app: app, tuner: FakeTuner())
+        flow.step = .voice
+        flow.takes = Array(repeating: take("HEY TRAY"), count: 4)
+        flow.primary()
+        while enroller.pending == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        change(flow)
+        enroller.finish(tuned)
+        while flow.calibrating { try await Task.sleep(for: .milliseconds(5)) }
+        return flow
+    }
+
+    let before = app.settings.wake
+    let left = try await calibrating { $0.leave(.voice) }
+    #expect(app.settings.wake == before && left.calibration == nil, "a left flow saves nothing")
+
+    let renamed = try await calibrating { _ in app.update { $0.rename("Dot") } }
+    #expect(app.settings.wake == WakeSettings(phrase: "hey dot"), "tuning for hey tray isn't saved under hey dot")
+    #expect(renamed.calibration == nil && app.settings.calibrationNote == nil)
+
+    app.update { $0.rename("Tray") }
+    let current = try await calibrating { _ in }
+    #expect(app.settings.wake == tuned && current.calibration != nil)
+}
+
+/// Reopening setup while it is open (the menu, Settings > Re-run, Not working?) leaves the open flow's step first:
+/// the Done step's wake test stops swallowing wakes.
+@MainActor @Test func reopeningSetupLeavesTheOpenFlow() throws {
+    _ = NSApplication.shared
+    let home = try tempDir()
+    defer { try? FileManager.default.removeItem(at: home) }
+    let app = QARender.model { $0.onboarded = false }
+    let delegate = AppDelegate(paths: Paths(home: home), finishingErase: false)
+    delegate.model = app
+    delegate.showOnboarding(startAt: .done)
+    defer { NSApp.windows.filter { $0.delegate === delegate }.forEach { $0.close() } }
+    #expect(app.wakeOverride != nil, "the Done step answers wakes itself")
+    delegate.showOnboarding()
+    #expect(app.wakeOverride == nil, "wakes reach the dot again")
+}

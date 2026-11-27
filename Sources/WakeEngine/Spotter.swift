@@ -5,11 +5,12 @@ import AVFoundation
 /// Queue-confined native spotter. Owns all native handles; stream resets match the Python detector.
 final class Spotter {
     let handle: OpaquePointer
-    /// The token sequences spotted: the phrase as the model writes it, the stored spellings, then the learned
-    /// sequences the model knows. Duplicates and sequences that are a prefix of another are dropped (a prefix
-    /// would fire first).
+    /// The token sequences spotted: the typed phrase, the phrase as the model writes it, the stored spellings, then
+    /// the learned sequences the model knows. Duplicates and sequences that are a prefix of another are dropped (a
+    /// prefix would fire first).
     static func keywords(_ settings: WakeSettings, tokenizer: KeywordTokenizer) throws -> [[String]] {
-        var all = [try written(settings.phrase, tokenizer: tokenizer)] + (try settings.spellings.map { try tokenizer.pieces(for: $0) })
+        var all = [try tokenizer.pieces(for: settings.phrase), try written(settings.phrase, tokenizer: tokenizer)]
+            + (try settings.spellings.map { try tokenizer.pieces(for: $0) })
         all += settings.learned.map { $0.split(separator: " ").map(String.init) }
             .filter { $0.count >= 2 && $0.allSatisfy(tokenizer.knows) }
         var unique: [[String]] = []
@@ -32,6 +33,9 @@ final class Spotter {
         var alternatives: [String] = []
         for group in [["ey", "ay", "ei"], ["ie", "y", "ee"], ["ph", "f"], ["c", "k"]] {
             for source in group where last.hasSuffix(source) {
+                // "-ie", "-y" and "-ee" sound alike only as an unstressed ending ("katie", "katy"), not as the
+                // name's only vowel ("lee", "ly"; "bee", "by").
+                if group.contains("ee"), !last.dropLast(source.count).contains(where: { "aeiou".contains($0) }) { continue }
                 for target in group where target != source {
                     let candidate = prefix + last.dropLast(source.count) + target
                     if !alternatives.contains(candidate), alternatives.count < 3 { alternatives.append(candidate) }
@@ -39,8 +43,9 @@ final class Spotter {
             }
         }
         if alternatives.count < 3 {
+            // A doubled consonant sounds like a single one ("jerry", "jery"); a doubled vowel does not ("doot", "dot").
             let letters = Array(last)
-            for i in letters.indices.dropFirst() where letters[i] == letters[i - 1] {
+            for i in letters.indices.dropFirst() where letters[i] == letters[i - 1] && !"aeiou".contains(letters[i]) {
                 var shorter = letters; shorter.remove(at: i)
                 let candidate = prefix + String(shorter)
                 if !alternatives.contains(candidate) { alternatives.append(candidate) }

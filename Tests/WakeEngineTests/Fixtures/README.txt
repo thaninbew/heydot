@@ -14,3 +14,5 @@ The rare-spelling test uses Lumynaropolis as the target spelling for the spoken 
 hey-dot-Daniel-320.wav uses the same command at 320 words/minute to test a short tuning attempt at the start of capture.
 hey-trey-Karen-340.wav and hey-trey-Daniel-300.wav (2026-11-27) use the same command at 340 and 300 words/minute: rushed "hey trey" with no
   pause after "hey", which standard settings missed while they listened only for the spelled `▁T RE Y`.
+hey-jerry-{Daniel,Samantha}.wav (2026-11-27) use the positive command above at 150 words/minute: standard settings missed them
+  while they listened only for the shorter sound-alike `▁JE RY` instead of the spelled `▁JE R RY`.

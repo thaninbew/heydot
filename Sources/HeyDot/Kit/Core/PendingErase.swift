@@ -16,6 +16,7 @@ struct PendingErase {
 
     func request() throws {
         guard paths.allowsProfileAccess else { throw UninstallData.ProfileAccessError() }
+        try UninstallData.validateErase(paths: paths)
         guard try paths.validateRemovalParents(of: marker) else { throw POSIXError(.ENOENT) }
         let fd = open(marker.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
         guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }

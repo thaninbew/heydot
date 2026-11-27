@@ -74,6 +74,8 @@ final class OnboardingModel: ObservableObject {
     @Published var tuneError: String?
     @Published var calibrating = false
     @Published var calibration: Tuning?
+    /// The calibration Continue started; leaving the step cancels it, so a left or replaced flow saves nothing.
+    private var calibrationTask: Task<Void, Never>?
     @Published var tuningSummary: String?
     @Published var devices: [AudioInput] = []
     let levels = LevelHistory()
@@ -145,7 +147,7 @@ final class OnboardingModel: ObservableObject {
 
     /// The footer's main button.
     func primary() {
-        if step == .voice && calibration == nil { Task { await calibrate() }; return }
+        if step == .voice && calibration == nil { calibrationTask = Task { await calibrate() }; return }
         next()
     }
 
@@ -183,6 +185,7 @@ final class OnboardingModel: ObservableObject {
     /// Quitting mid-setup: leave the step (stops tuning and its microphone, timers and test hooks) without
     /// finishing setup.
     func shutDown() {
+        cancelCalibration()
         stopTuning()
         stopWatchingWeb()
         app.wakeOverride = nil
@@ -210,7 +213,7 @@ final class OnboardingModel: ObservableObject {
     func leave(_ step: OnboardingStep) {
         switch step {
         case .connect: stopWatchingWeb()
-        case .voice: stopTuning(); app.refreshListening()
+        case .voice: cancelCalibration(); stopTuning(); app.refreshListening()
         case .done: stopTest()
         default: break
         }
@@ -425,18 +428,24 @@ final class OnboardingModel: ObservableObject {
     func calibrate() async {
         guard canSet else { return }
         stopTuning()
+        let phrase = app.settings.phrase
         calibrating = true
         defer { calibrating = false }
         do {
-            let result = try await app.enroller.calibrate(phrase: app.settings.phrase, positives: positives, negatives: [])
+            let result = try await app.enroller.calibrate(phrase: phrase, positives: positives, negatives: [])
+            // Left or replaced meanwhile, or the phrase changed in Settings: this tuning belongs to nothing current.
+            guard !Task.isCancelled, app.settings.phrase == phrase else { return }
             let tuning = Tuning(result)
             calibration = tuning
             tuningSummary = Self.summary(tuning, phrase: phraseTitle, positives: positives.count)
             app.update { $0.wake = result.settings; $0.calibrationNote = result.note }
         } catch {
+            guard !Task.isCancelled else { return }
             tuneError = AppModel.describe(error)
         }
     }
+
+    private func cancelCalibration() { calibrationTask?.cancel(); calibrationTask = nil }
 
     /// The tuning result in plain words (the heading says whether it was perfect).
     static func summary(_ t: Tuning, phrase: String, positives p: Int) -> String {

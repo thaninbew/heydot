@@ -79,16 +79,59 @@ Standard rows not shown (nova, maximilian, the rare name) are unchanged. "hey jo
 - **After tuning, rushed:** tuned fast TA is the same as before (59.4%): the old calibration already added the "tray"
   spelling. Further gains need the rushed `▁DR A Y` forms, which answer "hey dre" (see Rejected).
 
+## Follow-up before 0.2.5: the spelled phrase is spotted again
+
+Spotting only `Spotter.written` replaced the spelled phrase with its most likely sound-alike, and the shortest
+sound-alike usually won even where it doesn't sound like the name: "jerry" as `▁JE RY` ("jery"), "kitty" as `▁K ITY`,
+"hey lee" as `▁HE Y ▁LE` (which fires on "hey lemon"), and "hey doot" as `▁HE Y ▁DO T` (which is "hey dot"). Now
+every keyword set spots the spelled phrase as well as the written one (a shortened form that is a prefix of it drops
+out), a doubled vowel is no longer a sound-alike ("doot" is not "dot"), and "-ie", "-y" and "-ee" are swapped only as
+an unstressed ending ("katie", "katy"), not as a one-syllable name's only vowel ("lee", "ly"). Regression:
+`soundAlikesNeverReplaceTheSpelledPhrase` (two new `say` fixtures, `hey-jerry-{Daniel,Samantha}`; "hey doot" against
+the three "hey dot" fixtures) fails on `a01ce44` and passes now.
+
+Same harness and corpus as above, before = `a01ce44`. The extra names ran with `HEYDOT_EVAL_PHRASES` and the
+confusables in `AccuracyEval.similar` ("hey lee": "hey lets go", "hey leslie", "hey lemon"; "hey bee": "hey ben",
+"hey becky", "hey beth"; "hey doot": "hey dot", "hey don", "hey dude"; "hey jerry": "hey jenny", "hey jeff",
+"hey gary"). Rows not shown (luminaropolis, tray, dot, nova, maximilian, both settings) are identical before and
+after; the TV stream gives 0 wakes for every phrase and setting.
+
+| Phrase | Settings | TA before / after | TA fast before / after | TA fast paused before / after | FA before / after | FA fast before / after |
+|---|---|---|---|---|---|---|
+| hey trey | Standard | 62.5 / 56.2% | 40.6 / 40.6% | 43.8 / 43.8% | 1.3 / 3.0% | 0.6 / 0.6% |
+| hey trey | Tuned | 89.6 / 85.4% | 59.4 / 59.4% | 62.5 / 62.5% | 4.2 / 5.3% | 2.3 / 2.3% |
+| hey jerry | Standard | 2.1 / 81.2% | 0.0 / 65.6% | 0.0 / 68.8% | 0.0 / 1.0% | 0.0 / 0.0% |
+| hey jerry | Tuned | 81.2 / 81.2% | 78.1 / 75.0% | 71.9 / 71.9% | 0.8 / 0.8% | 0.3 / 0.3% |
+| hey kitty | Standard | 4.2 / 60.4% | 3.1 / 18.8% | 0.0 / 59.4% | 0.0 / 0.0% | 0.0 / 0.0% |
+| hey kitty | Tuned | 66.7 / 62.5% | 25.0 / 21.9% | 53.1 / 65.6% | 0.0 / 0.0% | 0.0 / 0.0% |
+| hey katie | Standard | 16.7 / 72.9% | 9.4 / 50.0% | 3.1 / 56.2% | 0.0 / 0.0% | 0.0 / 0.0% |
+| hey katie | Tuned | 77.1 / 79.2% | 50.0 / 50.0% | 53.1 / 56.2% | 0.0 / 0.0% | 0.0 / 0.0% |
+| hey happy | Standard | 16.7 / 77.1% | 9.4 / 81.2% | 3.1 / 78.1% | 0.0 / 0.0% | 0.0 / 0.0% |
+| hey happy | Tuned | 85.4 / 77.1% | 78.1 / 81.2% | 59.4 / 78.1% | 0.8 / 0.8% | 0.0 / 0.0% |
+| hey lee | Standard | 43.8 / 43.8% | 34.4 / 25.0% | 50.0 / 53.1% | 16.9 / 0.2% | 14.8 / 1.1% |
+| hey lee | Tuned | 70.8 / 66.7% | 62.5 / 59.4% | 53.1 / 62.5% | 18.4 / 3.6% | 17.3 / 4.5% |
+| hey bee | Standard | 62.5 / 45.8% | 50.0 / 6.2% | 40.6 / 34.4% | 12.5 / 1.5% | 14.5 / 0.3% |
+| hey bee | Tuned | 66.7 / 60.4% | 59.4 / 34.4% | 37.5 / 34.4% | 12.9 / 4.2% | 12.8 / 1.1% |
+| hey doot | Standard | 31.2 / 22.9% | 28.1 / 21.9% | 12.5 / 28.1% | 8.3 / 0.2% | 9.4 / 1.4% |
+| hey doot | Tuned | 56.2 / 45.8% | 50.0 / 43.8% | 46.9 / 43.8% | 11.0 / 4.0% | 9.7 / 3.4% |
+
+- **"hey trey" pays for it:** standard settings now also spot the spelled `▁T RE Y`, which a careful "Trey" can be
+  pulled onto (see above) and which answers "hey troy" more (16 against 7 of 528 at test rates). Rushed TA is
+  unchanged and `rushedHeyTreyWakesOnStandardSettings` still passes; standard TA stays above 0.2.0's 39.6%.
+- **Fewer false wakes, fewer catches, for the short names:** "hey dot" no longer wakes "hey doot" (40 / 28 of 48 / 32
+  before, 0 / 0 now); "hey lets go", "hey leslie" and "hey lemon" against "hey lee" fall from 89 to 1 at test rates.
+  The hits "hey bee" and "hey doot" lose were mostly the shorter `▁BE` and `▁DO T` paths matching other words.
+
 ## Resources
 
-Not re-measured. The listener spots one written phrase as before (a different spelling for some names) plus at most
+Not re-measured. The listener spots the typed phrase and, for some names, one written sound-alike, plus at most
 as many learned sequences as before. Calibration runs the decoder once per take, then releases it before the probe
 spotter loads (one model at a time), as before; `calibration` stays under 2 s.
 
 ## Not verified
 
 - **Live speech:** synthetic voices are cleaner and more uniform than a person. The owner's own rushed "Hey Trey"
-  was not recorded or replayed. A speaker-to-microphone loop on the agent Mac was not possible: its output is
+  was not recorded or replayed. A speaker-to-microphone loop on my test Mac was not possible: its output is
   muted and the test process has no microphone permission.
 - **Installed app:** no live tuning session or wake was run in the app; the tuning screens were checked with
   `HeyDot --qa-render` only.
