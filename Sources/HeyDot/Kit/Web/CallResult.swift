@@ -1,51 +1,40 @@
 import Foundation
 
-/// What a press attempt meant, in words for the popover. Mirrors adapters.PRESS_FAILURES.
-public struct CallResult: Sendable, Equatable {
-    public let outcome: String
-    public let message: String
-    public let wakeToPressMs: Int?
+/// What a press or check attempt meant (`outcome`, from `PageScripts.press` or the backend), in words for the UI.
+struct CallResult: Sendable, Equatable {
+    let outcome: String
+    let message: String
+    let wakeToPressMs: Int?
 
-    public var pressed: Bool { outcome == "pressed" }
-    public var wouldPress: Bool { outcome == "would-press" }
+    var pressed: Bool { outcome == "pressed" }
+    var wouldPress: Bool { outcome == "would-press" }
 
-    public static func describe(_ outcome: String) -> String {
+    /// The one message table for call outcomes, plus the backend's own reasons a call ended (`in-call`,
+    /// `no-mic`, `crashed`).
+    static func describe(_ outcome: String) -> String {
         switch outcome {
-        case "pressed": return "Call started."
-        case "would-press": return "Ready. HeyDot found your dot's call button and left it alone."
-        case "not-found": return "Couldn't find the call button. Open your dot in ChatGPT once and try again."
-        case "ambiguous": return "More than one call button is showing, so HeyDot didn't press anything."
-        case "wrong-dot": return "That tab shows a different conversation. Nothing was pressed."
-        case "disabled": return "The call button is off, probably because a call is already running."
-        case "challenge": return "chatgpt.com is showing a check. Open ChatGPT and finish it."
-        case "timeout": return "The page didn't answer in time. Nothing was pressed."
-        case "no-dot": return "Pick your dot's conversation first."
-        default: return "Something went wrong, so nothing was pressed."
+        case "pressed": "Call started."
+        case "would-press": "Ready. HeyDot found your dot's call button and left it alone."
+        case "signed-out": "HeyDot isn't signed in to ChatGPT. Sign in again from Settings."
+        case "challenge": "chatgpt.com wants to check it's you. Open the sign-in window from Settings and finish it there."
+        case "not-found": "Couldn't find the call button on your dot's page. Nothing was pressed."
+        case "wrong-dot": "Your dot's page didn't open (it went somewhere else). Check the dot link in Settings."
+        case "ambiguous": "More than one call button is showing, so HeyDot didn't press anything."
+        case "disabled": "The call button is off, probably because a call is already running."
+        case "in-call": "A call is already running."
+        case "hidden": "macOS didn't let HeyDot's call window become active in time. Nothing was pressed."
+        case "load-failed": "Couldn't load your dot's page. Check the internet connection."
+        case "timeout": "Your dot's page didn't finish loading in time. Nothing was pressed."
+        case "no-mic": "The call started but the microphone never opened, so HeyDot ended it."
+        case "crashed": "The ChatGPT page stopped, so the call ended."
+        case "no-dot": "Pick your dot's conversation first."
+        default: "Something went wrong, so nothing was pressed."
         }
     }
 
-    public init(outcome: String, message: String? = nil, wakeToPressMs: Int? = nil) {
+    init(outcome: String, message: String? = nil, wakeToPressMs: Int? = nil) {
         self.outcome = outcome
         self.message = message ?? Self.describe(outcome)
         self.wakeToPressMs = wakeToPressMs
-    }
-}
-
-public struct DotTab: Sendable, Equatable, Identifiable {
-    public let url: String
-    public let title: String
-    public var id: String { url }
-    public init(url: String, title: String) { self.url = url; self.title = title }
-    static func conversation(at url: URL?, title: String?) -> DotTab? {
-        guard let url, url.scheme == "https", url.host == "chatgpt.com", url.port == nil,
-              url.user == nil, url.password == nil, url.pathComponents.count == 3,
-              url.pathComponents[1] == "dots",
-              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
-        components.query = nil
-        components.fragment = nil
-        if components.percentEncodedPath.hasSuffix("/") { components.percentEncodedPath.removeLast() }
-        guard let link = components.url else { return nil }
-        let label = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return DotTab(url: link.absoluteString, title: label.isEmpty ? url.lastPathComponent : label)
     }
 }

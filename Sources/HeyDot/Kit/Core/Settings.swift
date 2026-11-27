@@ -3,43 +3,43 @@ import Foundation
 import WakeEngine
 
 /// Everything HeyDot remembers, stored as ~/Library/Application Support/HeyDot/settings.json.
-public struct AppSettings: Codable, Equatable, Sendable {
-    public var dotName: String = Phrase.defaultName
+struct AppSettings: Codable, Equatable, Sendable {
+    var dotName: String = Phrase.defaultName
     /// The wake phrase when the user set one (lowercase words, validated by `Phrase.validateWakePhrase`);
     /// nil follows the name ("hey <name>").
-    public var wakePhrase: String?
+    var wakePhrase: String?
     /// Detector settings from voice tuning. `wake.phrase` always follows `phrase`.
-    public var wake: WakeSettings = WakeSettings()
-    public var calibrationNote: String?
-    public var dotURL: String?
-    public var paused: Bool = false
+    var wake: WakeSettings = WakeSettings()
+    var calibrationNote: String?
+    var dotURL: String?
+    var paused: Bool = false
     /// When a timed pause ends (set through `--control pause --until`); nil for an untimed pause.
-    public var pausedUntil: Date?
+    var pausedUntil: Date?
     /// "Pause until tomorrow morning" resumes at this local time, in minutes after midnight (default 8:00 AM).
-    public var morningMinutes: Int = 8 * 60
-    public var launchAtLogin: Bool = false
-    public var design: DotDesign = .default
-    public var onboarded: Bool = false
+    var morningMinutes: Int = 8 * 60
+    var launchAtLogin: Bool = false
+    var design: DotDesign = .default
+    var onboarded: Bool = false
     /// Monochrome (a template image that matches macOS) is the default; Color draws the dot's own colours.
-    public var menuBarIcon: MenuBarIcon = .monochrome
+    var menuBarIcon: MenuBarIcon = .monochrome
     /// The microphone the user chose (Core Audio UID); nil is the built-in microphone. HeyDot never follows the
     /// macOS default input, and falls back to the built-in microphone while the chosen one is disconnected.
-    public var inputDeviceUID: String?
+    var inputDeviceUID: String?
     /// Calls that started, counted only until the one-time GitHub star card has been answered.
-    public var callsStarted: Int = 0
+    var callsStarted: Int = 0
     /// The popover's "star on GitHub" card was answered (either button); it never shows again.
-    public var starAsked: Bool = false
+    var starAsked: Bool = false
     /// The settings file format. 1: the logo is coral (`DotDesign.default`), so a violet mic is the user's own choice.
     /// Files without it were written before that and saved the logo as an earlier design.
-    public private(set) var version: Int = AppSettings.currentVersion
+    private(set) var version: Int = AppSettings.currentVersion
     static let currentVersion = 1
 
-    public init() {}
+    init() {}
 
-    public var phrase: String { wakePhrase ?? Phrase.phrase(forName: dotName) }
+    var phrase: String { wakePhrase ?? Phrase.phrase(forName: dotName) }
 
     /// Renames the dot. A custom wake phrase stays; a phrase that follows the name changes with it.
-    public mutating func rename(_ name: String) {
+    mutating func rename(_ name: String) {
         guard name != dotName else { return }
         let old = phrase
         dotName = name
@@ -47,7 +47,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     }
 
     /// Sets the wake phrase (already validated); nil, or the name's own "hey <name>", follows the name again.
-    public mutating func setWakePhrase(_ value: String?) {
+    mutating func setWakePhrase(_ value: String?) {
         let old = phrase
         wakePhrase = value == Phrase.phrase(forName: dotName) ? nil : value
         phraseChanged(from: old)
@@ -60,7 +60,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         calibrationNote = nil
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         // Tolerate missing keys and ignore obsolete keys, including the former backend choice.
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let base = AppSettings()
@@ -85,23 +85,23 @@ public struct AppSettings: Codable, Equatable, Sendable {
     }
 }
 
-public enum MenuBarIcon: String, Codable, CaseIterable, Sendable {
+enum MenuBarIcon: String, Codable, CaseIterable, Sendable {
     case monochrome, color
-    public var label: String { self == .monochrome ? "Monochrome (matches macOS)" : "Color" }
+    var label: String { self == .monochrome ? "Monochrome (matches macOS)" : "Color" }
 }
 
-public struct SettingsStore: Sendable {
-    public let url: URL
+struct SettingsStore: Sendable {
+    let url: URL
 
-    public init(url: URL = Paths().settings) { self.url = url }
+    init(url: URL = Paths().settings) { self.url = url }
 
     /// Missing file means first run (defaults). An unreadable file is reported, never silently replaced.
-    public func load() throws -> AppSettings {
+    func load() throws -> AppSettings {
         guard let data = try read(url) else { return AppSettings() }
         return try JSONDecoder().decode(AppSettings.self, from: data)
     }
 
-    public func save(_ settings: AppSettings) throws {
+    func save(_ settings: AppSettings) throws {
         try write(encode(settings), to: url)
     }
 
@@ -163,7 +163,7 @@ public struct SettingsStore: Sendable {
 
     /// `--reset-onboarding`: moves the settings file aside to `settings.json.reset-<UTC timestamp>` (kept, never
     /// deleted) so the next launch starts setup from the beginning. Returns the backup, or nil if there was none.
-    public func moveAside(now: Date = Date()) throws -> URL? {
+    func moveAside(now: Date = Date()) throws -> URL? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let stamp = ISO8601DateFormatter()
         stamp.formatOptions = [.withYear, .withMonth, .withDay, .withTime, .withTimeZone]

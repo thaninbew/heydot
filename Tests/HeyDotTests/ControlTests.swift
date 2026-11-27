@@ -1,47 +1,11 @@
 import AVFoundation
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
-import WakeEngine
+import WebKit
 @testable import HeyDotKit
-
-// MARK: Fakes: the engine and system hooks never touch the mic or login items.
-
-@MainActor
-final class FakeEngine: WakeListening {
-    var isListening = false
-    var inputLevel: Float = -60
-    var inputDeviceUID: String?
-    /// The microphone each start used.
-    var startedOn: [String?] = []
-    func start(_ settings: WakeSettings, onWake: @escaping @MainActor (WakeEvent) -> Void) throws {
-        isListening = true; startedOn.append(inputDeviceUID)
-    }
-    func stop() { isListening = false }
-}
-
-private func shortHome() throws -> URL {
-    // sun_path is 104 bytes, so the control socket's home stays under /tmp.
-    let dir = URL(fileURLWithPath: "/tmp/hc-\(UUID().uuidString.prefix(8))", isDirectory: true)
-    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    return dir
-}
-
-@MainActor
-private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, FakeEngine) {
-    var s = settings ?? AppSettings()
-    if settings == nil { s.rename("Tray"); s.dotURL = "https://chatgpt.com/dots/tray"; s.onboarded = true }
-    let paths = Paths(home: home)
-    let hooks = SystemHooks(
-                            setLaunchAtLogin: { _ in }, launchAtLoginEnabled: { false },
-                            microphoneStatus: { .authorized }, requestMicrophone: { $0(true) })
-    let engine = FakeEngine()
-    let model = AppModel(settings: s, engine: engine, enroller: Enroller(),
-                         hooks: hooks, store: SettingsStore(url: paths.settings))
-    model.refreshListening()
-    return (model, engine)
-}
-
-// MARK: Parsing
+@testable import WakeEngine
 
 @Test func timesParseAsLocalOrWithOffsetAndRejectNonsense() throws {
     let est = TimeZone(identifier: "America/New_York")!
@@ -84,7 +48,7 @@ private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, F
 }
 
 @Test func sshEntryRefusesBeforeTouchingTheApp() throws {
-    let home = try shortHome()
+    let home = try shortTempDir()
     defer { try? FileManager.default.removeItem(at: home) }
     let paths = Paths(home: home)
     #expect(ControlCLI.run(arguments: ["HeyDot", "--control-ssh"], environment: [:], paths: paths) == 2)
@@ -92,11 +56,9 @@ private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, F
     #expect(ControlCLI.run(arguments: ["HeyDot"], environment: [:], paths: paths) == nil)  // the menu bar app
 }
 
-// MARK: The app side
-
 @MainActor
 @Test func pauseAndResumeReportWakeAndPersist() throws {
-    let home = try shortHome()
+    let home = try shortTempDir()
     defer { try? FileManager.default.removeItem(at: home) }
     let (model, engine) = readyModel(home: home)
     #expect(model.controlState["wake"] == "on" && model.controlState["state"] == "listening")
@@ -115,7 +77,7 @@ private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, F
 
 @MainActor
 @Test func onlyADueTimedPauseResumesByItself() throws {
-    let home = try shortHome()
+    let home = try shortTempDir()
     defer { try? FileManager.default.removeItem(at: home) }
     let (model, _) = readyModel(home: home)
     model.pause(until: Date().addingTimeInterval(60))
@@ -132,15 +94,30 @@ private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, F
 
 @MainActor
 @Test func wakeIsUnknownWhenNotListeningForAnotherReason() throws {
-    let home = try shortHome()
+    let home = try shortTempDir()
     defer { try? FileManager.default.removeItem(at: home) }
     let (model, _) = readyModel(home: home, settings: AppSettings())  // setup not finished
     #expect(model.controlState["wake"] == .null && model.controlState["state"] == "setup_needed")
 }
 
+@MainActor @Test func pauseUntilMorningAndTimeLeft() {
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "America/New_York")!
+    let evening = cal.date(from: DateComponents(year: 2026, month: 11, day: 15, hour: 21, minute: 41))!
+    #expect(AppModel.nextMorning(minutes: 480, now: evening, calendar: cal) == cal.date(from: DateComponents(year: 2026, month: 11, day: 16, hour: 8)))
+    let night = cal.date(from: DateComponents(year: 2026, month: 11, day: 16, hour: 1, minute: 5))!
+    #expect(AppModel.nextMorning(minutes: 7 * 60 + 30, now: night, calendar: cal)
+            == cal.date(from: DateComponents(year: 2026, month: 11, day: 16, hour: 7, minute: 30)))
+    let now = Date()
+    #expect(AppModel.remaining(until: now.addingTimeInterval(42 * 60), now: now) == "42 min left")
+    #expect(AppModel.remaining(until: now.addingTimeInterval(65 * 60), now: now) == "1 h 5 min left")
+    #expect(AppModel.remaining(until: now.addingTimeInterval(2 * 3600), now: now) == "2 h left")
+    #expect(AppModel.remaining(until: now.addingTimeInterval(20), now: now) == "Less than a minute left")
+    #expect(AppModel.pauseDurations.map(\.1) == [900, 1800, 3600, 7200, 14400])
+}
+
 @MainActor
 @Test func controlSocketRoundTripAndTimedPauseEndsInsideTheApp() async throws {
-    let home = try shortHome()
+    let home = try shortTempDir()
     defer { try? FileManager.default.removeItem(at: home) }
     let paths = Paths(home: home)
     let (model, engine) = readyModel(home: home)
@@ -165,7 +142,7 @@ private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, F
 }
 
 @Test func notRunningIsAReadableStatusButPauseFails() throws {
-    let home = try shortHome()
+    let home = try shortTempDir()
     defer { try? FileManager.default.removeItem(at: home) }
     let paths = Paths(home: home)
     #expect(ControlCLI.execute(["status", "--json"], paths: paths) == 0)
@@ -174,7 +151,7 @@ private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, F
 }
 
 @MainActor @Test func stoppedPauseServiceCannotRearmOrResume() async throws {
-    let home = try shortHome()
+    let home = try shortTempDir()
     defer { try? FileManager.default.removeItem(at: home) }
     let (model, _) = readyModel(home: home)
     let service = try ControlService(model: model, paths: Paths(home: home))
@@ -187,51 +164,44 @@ private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, F
     #expect(service.handle(["op": "resume"])["outcome"] == "error")
 }
 
-@MainActor private final class PendingCallWeb: WebCalling {
-    var inCall = false
-    var onCallChange: ((String?) -> Void)?
-    var calls = 0
-    var pending: CheckedContinuation<CallResult, Never>?
-    func call(dotURL: String, wakeAt: Date) async -> CallResult {
-        calls += 1
-        return await withCheckedContinuation { pending = $0 }
-    }
-    func check(dotURL: String) async -> CallResult { CallResult(outcome: "would-press") }
-    func endCall() { inCall = false }
-    func warm(dotURL: String?) {}
-    func pageState() async -> WebPageState { WebPageState(signedIn: nil) }
-    func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {}
-    func signOut() async {}
+@Test func missingAppReportsNoHelper() throws {
+    let root = try shortTempDir()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let socket = root.appendingPathComponent("control.sock")
+    #expect(!ControlSocket.isHelperRunning(socket: socket))
+    #expect(ControlSocket.request(["op": "status"], socket: socket)["outcome"] == "no-helper")
 }
 
-@MainActor @Test func overlappingCallsAreRejectedAndQuitDropsLateResults() async throws {
-    let web = PendingCallWeb()
-    var settings = AppSettings(); settings.dotURL = "https://chatgpt.com/dots/test"; settings.onboarded = true
-    let model = AppModel(settings: settings, engine: FakeEngine(), enroller: FakeEnroller(),
-                         web: web, hooks: QARender.fakeHooks(), store: nil,
-                         log: Log(url: URL(fileURLWithPath: "/dev/null")))
-    let first = Task { await model.call() }
-    while web.pending == nil { await Task.yield() }
-    await model.call()
-    #expect(web.calls == 1)
-    model.stop()
-    web.pending?.resume(returning: CallResult(outcome: "pressed")); web.pending = nil
-    await first.value
-    #expect(!model.calling && model.lastResult == nil)
-    await model.call()
-    #expect(web.calls == 1)
+final class LockedBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: T
+    init(_ value: T) { stored = value }
+    var value: T { lock.lock(); defer { lock.unlock() }; return stored }
+    @discardableResult func mutate<R>(_ body: (inout T) -> R) -> R { lock.lock(); defer { lock.unlock() }; return body(&stored) }
 }
 
-// MARK: Microphone choice
+@Test func socketDeadlineBoundsAnUnresponsivePeer() throws {
+    let root = try shortTempDir()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let socket = root.appendingPathComponent("hang.sock")
+    let server = try ControlSocket.Server(socket: socket)
+    defer { server.close() }
+    Thread.detachNewThread { server.serve { _ in Thread.sleep(forTimeInterval: 0.3); return ["outcome": "ok"] } }
+    let start = ProcessInfo.processInfo.systemUptime
+    #expect(ControlSocket.request(["op": "status"], socket: socket, timeout: 0.05)["outcome"] == "no-reply")
+    #expect(ProcessInfo.processInfo.systemUptime - start < 0.25)
+    server.close()  // repeated shutdown must not close a reused descriptor
+    #expect(!FileManager.default.fileExists(atPath: socket.path))
+}
 
-@MainActor @Test func microphoneChoiceReachesTheListenerAndPersists() throws {
-    let home = try shortHome()
-    defer { try? FileManager.default.removeItem(at: home) }
-    let (model, engine) = readyModel(home: home)
-    #expect(engine.startedOn == [nil])  // built-in by default
-    model.update { $0.inputDeviceUID = "AppleUSBAudioEngine:Mic" }
-    #expect(engine.startedOn == [nil, "AppleUSBAudioEngine:Mic"])  // takes effect at once
-    #expect(try SettingsStore(url: Paths(home: home).settings).load().inputDeviceUID == "AppleUSBAudioEngine:Mic")
-    model.update { $0.inputDeviceUID = nil }
-    #expect(engine.startedOn.last == .some(nil))
+@Test func socketReadDeadlineDoesNotResetForEachByte() throws {
+    var fds: [Int32] = [0, 0]
+    #expect(pipe(&fds) == 0)
+    let input = fds[0], output = fds[1]
+    defer { close(input); close(output) }
+    // Data is already buffered but lacks a newline. A total deadline must still expire.
+    _ = ControlSocket.writeAll(output, Data("{\"outcome\":".utf8))
+    let start = ProcessInfo.processInfo.systemUptime
+    #expect(ControlSocket.readLine(input, deadline: start + 0.04) == nil)
+    #expect(ProcessInfo.processInfo.systemUptime - start < 0.25)
 }

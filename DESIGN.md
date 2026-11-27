@@ -1,7 +1,7 @@
 # HeyDot design: Frost
 
-Liquid Glass with pill components. Every value below lives in `Sources/HeyDot/Kit/UI/Frost.swift`; surfaces use
-those pieces and never restyle a control locally.
+Liquid Glass with pill components. Every value below lives in `Sources/HeyDot/Kit/Frost/` (tokens in `Frost.swift`,
+buttons in `FrostButton.swift`); surfaces use those pieces and never restyle a control locally.
 
 ## Materials
 
@@ -21,16 +21,20 @@ fallback over a sample wallpaper.
 
 | Role | Use | Height | Padding | Width |
 | --- | --- | --- | --- | --- |
-| `.primary` | The one action that moves on (Get started, Continue, Sign in, Call, Save) | 46 | 24 | at least 132, grows with text |
-| `.secondary` | Its alternative (Later, Try a call, Cancel) | 46 | 24 | at least 132 |
+| `.primary` | The one action that moves on (Get started, Continue, Sign in, Save) | 46 | 24 | at least 132, grows with text |
+| `.wide` | The popover's one main action (Call, Finish setup, Sign in to ChatGPT), a primary as wide as the popover | 46 | 24 | fills the width |
+| `.secondary` | Its alternative (Later, Try a call, Cancel, Reset to HeyDot) | 46 | 24 | at least 132 |
 | `.round` | Back, Mute | 46 circle (54 in a call) | | |
 | `.hangUp` | Hang up | 54 circle, red tint | | |
-| `.chip` | Inline actions in cards and Settings, pause chips, Resume | 30 | 11 | fits the text |
+| `.chip` | Inline actions in cards, Settings and Troubleshoot, pause chips and the pause timer menu, Resume, Design your dot and its Later, the microphone menu | 30 | 11 | fits the text |
+| `.primaryChip` | The recommended action among chips (the fix Troubleshoot suggests first), tinted like the primary | 30 | 11 | fits the text |
 
 A button row holds only back, Later where it applies, and the primary, centred with 12 pt between them. The tinted
 primary is the recommendation; there is no badge. Hints sit above the row. Every setup step uses `SetupStepLayout`:
 page dots fixed at the top, the content centred between, and the row pinned 32 pt from the bottom, so it never
-moves between steps or as a step's content changes. A footer row keeps one pill height whatever it shows. Destructive chips use red text.
+moves between steps or as a step's content changes. A footer row keeps one pill height whatever it shows. The dot
+designer's footer is the macOS sheet layout: Reset to HeyDot on the left, Cancel and Save on the right, all three pills.
+Menus open from a chip (the microphone menu, the pause timer) and list their items natively. Destructive chips use red text.
 `FrostChoice` replaces segmented controls (a capsule track of chips, the chosen one filled with the accent).
 Forms apply `FrostButtonStyle(role: .chip)` once to the whole form.
 
@@ -50,7 +54,7 @@ its own colours. The Monochrome option lets macOS tint the template.
 
 ## Theme from dot
 
-`Theme` (`Kit/UI/Theme.swift`) derives the whole look from the dot, deterministically, in OKLCH. The goal is the
+`Theme` (`Kit/Frost/Theme.swift`) derives the whole look from the dot, deterministically, in OKLCH. The goal is the
 dot's own main colour, not a blend of its colours.
 
 1. **Palette** from the design data, not pixels: the main colour (the dot body), then the accessory colour when it

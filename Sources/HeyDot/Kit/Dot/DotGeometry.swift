@@ -166,11 +166,11 @@ enum Probe {
     }
 }
 
-public enum LayerRole: Sendable { case body, eye, highlight, line, accessory, glint }
+enum LayerRole: Sendable { case body, eye, highlight, line, accessory, glint }
 
-public struct DotLayer: @unchecked Sendable {
-    public let path: CGPath
-    public let role: LayerRole
+struct DotLayer: @unchecked Sendable {
+    let path: CGPath
+    let role: LayerRole
 }
 
 enum DotArt {

@@ -175,58 +175,8 @@ private final class LiveSession: @unchecked Sendable {
 
 @MainActor private final class InputSelection { var uid: String? }
 
-private final class Recording: @unchecked Sendable {
-    let lock = NSLock()
-    let capture = Capture(input: AudioInputs.current(preferredUID: nil))
-    var samples: Clip = []
-    var speech = false, finished = false
-    var silent = 0
-    var continuation: CheckedContinuation<Clip, Error>?
-    func finish(_ result: Result<Clip, Error>) {
-        lock.lock()
-        guard !finished else { lock.unlock(); return }
-        finished = true; let continuation = continuation; self.continuation = nil
-        lock.unlock()
-        capture.stop()
-        continuation?.resume(with: result)
-    }
-}
-
 public final class Enroller: WakeEnrolling {
     public init() {}
-    public func record(seconds: Double) async throws -> Clip {
-        guard seconds.isFinite, seconds > 0, seconds <= 60 else { throw WakeEngineError.engine("Recording duration must be in (0, 60] seconds") }
-        let recording = Recording()
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                recording.lock.lock()
-                if recording.finished { recording.lock.unlock(); continuation.resume(throwing: CancellationError()); return }
-                recording.continuation = continuation
-                recording.lock.unlock()
-                do {
-                    try recording.capture.start { samples in
-                        recording.lock.lock()
-                        guard !recording.finished else { recording.lock.unlock(); return }
-                        let remaining = max(0, Int(seconds * 16000) - recording.samples.count)
-                        recording.samples.append(contentsOf: samples.prefix(remaining))
-                        let rms = sqrt(samples.reduce(0) { $0 + $1 * $1 } / Float(max(1, samples.count)))
-                        if rms > 0.01 { recording.speech = true; recording.silent = 0 }
-                        else if recording.speech { recording.silent += samples.count }
-                        let done = recording.samples.count >= Int(seconds * 16000) || recording.silent >= 12800
-                        let clip = done ? recording.samples : []
-                        recording.lock.unlock()
-                        if done { recording.finish(.success(clip)) }
-                    }
-                    // Also bound wall time when an input device stops delivering buffers.
-                    DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { [weak recording] in
-                        guard let recording else { return }
-                        recording.lock.lock(); let samples = recording.samples; recording.lock.unlock()
-                        recording.finish(.success(samples))
-                    }
-                } catch { recording.finish(.failure(error)) }
-            }
-        } onCancel: { recording.finish(.failure(CancellationError())) }
-    }
     /// Learns the token sequences the model hears in the user's takes that agree: every specific (long) reading, and
     /// a short one when it is how this user says it and the listener would miss that take without it
     /// (`Takes.specific`, `Takes.repeated`). Then it measures each clip's confidence (the highest threshold at which

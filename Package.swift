@@ -11,8 +11,8 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
     ],
     targets: [
-        // On-device keyword spotting (sherpa-onnx C API), microphone capture, enrollment calibration.
-        // Owned by the engine workstream. Exposes only the contract in WakeEngineAPI.swift.
+        // On-device keyword spotting (sherpa-onnx C API), microphone capture and voice tuning.
+        // The app uses it through the contract in WakeEngineAPI.swift.
         .systemLibrary(name: "CSherpa", path: "Sources/WakeEngine/CSherpa"),
         .target(name: "WakeEngine", dependencies: ["CSherpa"], path: "Sources/WakeEngine",
                 exclude: ["CSherpa", "EngineCheck"], linkerSettings: [
@@ -26,7 +26,6 @@ let package = Package(
                 ]),
         .executableTarget(name: "heydot-engine-check", dependencies: ["WakeEngine"], path: "Sources/WakeEngine/EngineCheck"),
         // The menu bar app: onboarding, dot maker and hidden browser.
-        // Owned by the app workstream.
         .target(name: "HeyDotKit", dependencies: ["WakeEngine", .product(name: "Sparkle", package: "Sparkle")], path: "Sources/HeyDot/Kit",
                 // The avatar prompt, compiled into the binary (no resource bundle to ship).
                 resources: [.embedInCode("Resources/AvatarAgentPrompt.md"),

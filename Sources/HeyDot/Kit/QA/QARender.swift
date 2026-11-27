@@ -4,31 +4,6 @@ import SwiftUI
 import WakeEngine
 import WebKit
 
-/// Stand-ins for QA renders: no microphone, no login items, no files outside the output folder.
-@MainActor
-final class FakeEngine: WakeListening {
-    var inputLevel: Float = -17
-    var isListening = false
-    var inputDeviceUID: String?
-    func start(_ settings: WakeSettings, onWake: @escaping @MainActor (WakeEvent) -> Void) throws { isListening = true }
-    func stop() { isListening = false }
-}
-
-@MainActor
-final class FakeTuner: VoiceTuner {
-    func start(phrase: String, inputUID: String?, onLevel: @escaping @MainActor (Float, Bool) -> Void,
-               onUtterance: @escaping @MainActor (Utterance) -> Void) throws {}
-    func stop() {}
-}
-
-struct FakeEnroller: WakeEnrolling {
-    func record(seconds: Double) async throws -> Clip { Array(repeating: 0.2, count: 16000) }
-    // QA fixtures set the tuning result directly; `Calibration` has no public initializer to fake.
-    func calibrate(phrase: String, positives: [Clip], negatives: [Clip]) async throws -> Calibration {
-        throw WakeEngineError.engine("QA fake does not calibrate")
-    }
-}
-
 @MainActor
 enum QARender {
     static func fakeHooks(mic: AVAuthorizationStatus = .authorized) -> SystemHooks {
@@ -145,7 +120,7 @@ enum QARender {
             let inCall = NoWeb(); inCall.inCall = true; inCall.microphoneMuted = false
             try both("popover-in-call") { popover(model(web: inCall)) }
             try both("popover-call-failed") {
-                let failed = model(); failed.setFixture(result: CallResult(outcome: "not-found", message: WebCallBackend.describe("not-found")), signedIn: true); return popover(failed)
+                let failed = model(); failed.setFixture(result: CallResult(outcome: "not-found"), signedIn: true); return popover(failed)
             }
 
             // Not working?: running, stopped at each kind of problem, and all clear.
@@ -165,7 +140,7 @@ enum QARender {
             try doctor("troubleshoot-call-button", [.microphoneAccess: .ok("HeyDot can use the microphone."),
                 .listening: .ok("Listening on \(mic)."), .hearing: .ok("Sound is reaching HeyDot from \(mic)."),
                 .phrase: .ok("Heard \u{201C}Hey Tray\u{201D}."), .signIn: .ok("Signed in to ChatGPT."),
-                .callButton: .problem(.callButton, WebCallBackend.describe("not-found"))])
+                .callButton: .problem(.callButton, CallResult.describe("not-found"))])
             try doctor("troubleshoot-done", Dictionary(uniqueKeysWithValues: Troubleshooter.Step.allCases.map { ($0, .ok("Fine.")) }))
 
             // Onboarding: every step and the tuning screen's states.
@@ -328,208 +303,6 @@ enum QARender {
             FileHandle.standardError.write(Data("render-icon failed: \(error)\n".utf8))
             return 1
         }
-    }
-}
-
-extension QARender {
-    /// The sign-in window over the live, logged-out chatgpt.com, in a throwaway non-persistent store.
-    /// WebKit draws out of process, so the page is captured with `takeSnapshot` and composited under the header.
-    static func renderSignIn(into dir: URL) -> Int32 {
-        _ = NSApplication.shared
-        NSApp.setActivationPolicy(.accessory)
-        do {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let size = NSSize(width: 980, height: 760)
-            let web = WKWebView(frame: NSRect(origin: .zero, size: size), configuration: {
-                let c = WKWebViewConfiguration(); c.websiteDataStore = .nonPersistent(); return c
-            }())
-            web.load(URLRequest(url: URL(string: "https://chatgpt.com/")!))
-            let deadline = Date().addingTimeInterval(20)
-            while (web.isLoading || web.url == nil) && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.2)) }
-            RunLoop.main.run(until: Date().addingTimeInterval(4))  // let the page render after load
-            for dark in [false, true] {
-                let host = NSHostingView(rootView: SignInView(web: nil, state: SignInState(), done: {}).frame(width: size.width, height: size.height)
-                    .environment(\.colorScheme, dark ? .dark : .light))
-                host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-                let window = KeyWindow(contentRect: NSRect(origin: NSPoint(x: -4000, y: -4000), size: size), styleMask: [.borderless],
-                                       backing: .buffered, defer: false)
-                window.contentView = host
-                window.makeKeyAndOrderFront(nil)
-                host.layoutSubtreeIfNeeded()
-                RunLoop.main.run(until: Date().addingTimeInterval(0.3))
-                guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw CocoaError(.fileWriteUnknown) }
-                host.cacheDisplay(in: host.bounds, to: rep)
-                window.orderOut(nil)
-                // The header's height: everything above the web area (the Divider sits at its bottom).
-                let header = host.subviews.isEmpty ? 70 : headerHeight(rep)
-                web.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-                RunLoop.main.run(until: Date().addingTimeInterval(1.5))
-                var page: NSImage?
-                var done = false
-                let config = WKSnapshotConfiguration()
-                config.rect = NSRect(x: 0, y: 0, width: size.width, height: size.height - header)
-                web.setFrameSize(NSSize(width: size.width, height: size.height - header))
-                web.takeSnapshot(with: config) { image, _ in page = image; done = true }
-                while !done && Date() < deadline.addingTimeInterval(10) { RunLoop.main.run(until: Date().addingTimeInterval(0.1)) }
-                let composite = NSImage(size: size)
-                composite.lockFocus()
-                (dark ? NSColor(white: 0.16, alpha: 1) : NSColor(white: 0.93, alpha: 1)).setFill()
-                NSRect(origin: .zero, size: size).fill()
-                NSImage(cgImage: rep.cgImage!, size: size).draw(in: NSRect(origin: .zero, size: size))
-                page?.draw(in: NSRect(x: 0, y: 0, width: size.width, height: size.height - header))
-                composite.unlockFocus()
-                guard let tiff = composite.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
-                else { throw CocoaError(.fileWriteUnknown) }
-                try png.write(to: dir.appendingPathComponent(dark ? "signin-window-dark.png" : "signin-window.png"))
-            }
-            print("qa-signin: page \(web.url?.absoluteString ?? "none"), title \(web.title ?? "")")
-            return 0
-        } catch {
-            FileHandle.standardError.write(Data("qa-signin failed: \(error)\n".utf8))
-            return 1
-        }
-    }
-
-    /// Finds the header's divider: the first row from the top, below 40 px, that differs from the row above it
-    /// across the whole width (the web area of the header-only render is a flat fill).
-    private static func headerHeight(_ rep: NSBitmapImageRep) -> CGFloat {
-        let scale = CGFloat(rep.pixelsHigh) / rep.size.height
-        var last: NSColor?
-        var y = Int(40 * scale)
-        while y < rep.pixelsHigh {
-            let c = rep.colorAt(x: rep.pixelsWide - 2, y: y)
-            if let last, let c, abs(last.brightnessComponent - c.brightnessComponent) > 0.03 { return CGFloat(y) / scale + 1 }
-            last = c; y += 1
-        }
-        return 70
-    }
-}
-
-/// The default logo as the user sees it: app-style tiles at 128, 64 and 32 pt plus the popover avatar size.
-struct LogoSheet: View {
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 18) {
-            ForEach([128.0, 64, 52, 32], id: \.self) { size in
-                VStack(spacing: 6) {
-                    DotTile(.default, size: size)
-                    Text("\(Int(size)) pt").font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-            VStack(spacing: 6) {
-                DotTile(.default, size: 64, dark: true)
-                Text("dark tile").font(.caption2).foregroundStyle(.secondary)
-            }
-        }
-        .padding(20)
-    }
-}
-
-/// Accent swatches with the contrast each one reaches.
-struct AccentBoard: View {
-    static let samples: [(String, DotDesign)] = [
-        ("tray", DotDesign(shape: .roundedTriangle, color: .lime, accessory: .headphones, fill: .colorBody)), ("pale", DotDesign(color: .yellow)), ("near-black", DotDesign(color: .charcoal)), ("default", .default),
-    ]
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ForEach(Self.samples, id: \.0) { name, design in
-                let raw = Accent.source(for: design), ui = Accent.hex(for: design)
-                HStack(spacing: 14) {
-                    Text(name).font(.headline).frame(width: 90, alignment: .leading)
-                    RoundedRectangle(cornerRadius: 6).fill(Color(hex: raw)).frame(width: 44, height: 30)
-                    Image(systemName: "arrow.right").foregroundStyle(.secondary)
-                    RoundedRectangle(cornerRadius: 6).fill(Color(hex: ui)).frame(width: 44, height: 30)
-                    Text(String(format: "#%06X  white text %.1f:1  dark window %.1f:1  light window %.1f:1", ui,
-                                Accent.contrast(ui, 0xFFFFFF), Accent.contrast(ui, Accent.darkWindow), Accent.contrast(ui, Accent.lightWindow)))
-                        .font(.system(size: 12, design: .monospaced))
-                    Button("Continue") {}.frostButton(.primary)
-                    TileRings(size: 14, level: -20).frame(width: 30, height: 30)
-                }
-                .frostAccent(design)
-            }
-        }
-        .padding(20)
-        .background(FrostBackdrop())
-    }
-}
-
-/// The six reference dots and their themes side by side: the backdrop each one gets, its stops and its accent.
-struct ThemeBoard: View {
-    /// (name, the dot, a palette override for colours no dot option expresses: a true red and a pale pastel).
-    static let samples: [(String, DotDesign, Theme?)] = {
-        var tray = DotDesign(shape: .roundedTriangle, color: .lime, accessory: .headphones, fill: .colorBody); tray.accessoryColor = .blue  // the lime example: lime with blue headphones
-        return [
-            ("default", .default, nil),
-            ("tray", tray, nil),
-            ("green-blue", DotDesign(color: .teal, accessory: .headphones, accessoryColor: .blue), Theme.from(palette: [0x2DB84D, 0x2F6BFF])),
-            ("red", DotDesign(color: .coral), Theme.from(palette: [0xE0353B])),
-            ("pale", DotDesign(color: .pink), Theme.from(palette: [0xF6D6E8])),
-            ("near-black", DotDesign(color: .charcoal), nil),
-        ]
-    }()
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            ForEach(Self.samples, id: \.0) { name, design, override in
-                let theme = override ?? Theme.forDesign(design)
-                VStack(spacing: 10) {
-                    ZStack {
-                        FrostBackdrop()
-                        VStack(spacing: 14) {
-                            DotTile(design, size: 64, dark: true)
-                            Button("Continue") {}.frostButton(.primary)
-                            HStack(spacing: 5) {
-                                Capsule().fill(Color(hex: Accent.mark(theme.accent, dark: scheme == .dark))).frame(width: 18, height: 6)
-                                ForEach(0..<3, id: \.self) { _ in Circle().fill(Color.primary.opacity(0.18)).frame(width: 6, height: 6) }
-                            }
-                        }
-                    }
-                    .frame(width: 220, height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: Frost.Radius.card, style: .continuous))
-                    Text(name).font(.headline)
-                    HStack(spacing: 4) {
-                        ForEach(theme.stops(dark: scheme == .dark), id: \.self) { hex in
-                            RoundedRectangle(cornerRadius: 4).fill(Color(hex: hex)).frame(width: 30, height: 18)
-                        }
-                        Circle().fill(Color(hex: theme.accent)).frame(width: 18, height: 18).padding(.leading, 4)
-                    }
-                    Text(String(format: "accent #%06X  label %.1f:1", theme.accent, Accent.contrast(theme.accent, Accent.label(on: theme.accent))))
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                }
-                .frostTheme(theme)
-            }
-        }
-        .padding(20)
-        .background(SampleWallpaper())
-    }
-}
-
-struct GlyphStrip: View {
-    static let designs: [DotDesign] = [.default, DotDesign(shape: .roundedTriangle, color: .lime, accessory: .headphones),
-                                       DotDesign(shape: .heart, color: .pink, fill: .colorBody), DotDesign(shape: .hexagon, color: .coral, accessory: .crown)]
-    var extra: [DotDesign] = []
-    var designs: [DotDesign] { Self.designs + extra }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach([false, true], id: \.self) { color in
-                Text(color ? "Menu bar icon: Color" : "Menu bar icon: Monochrome (default)").font(.system(size: 11, weight: .semibold))
-                ForEach([(false, Color(hex: 0xECECEC)), (true, Color(hex: 0x1E1E1E))], id: \.0) { dark, bg in
-                    HStack(spacing: 18) {
-                        ForEach(designs, id: \.self) { design in
-                            ForEach([GlyphState.listening, .paused, .attention, .ok], id: \.self) { state in
-                                let image = DotGlyph.image(design, state: state, color: color, darkBar: dark)
-                                if color { Image(nsImage: image) }
-                                else { Image(nsImage: image).renderingMode(.template).foregroundStyle(dark ? Color.white : Color.black) }
-                            }
-                            Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 1, height: 16)
-                        }
-                    }
-                    .padding(.horizontal, 12).frame(height: 24).background(bg)
-                }
-            }
-        }
-        .padding(10)
-        .background(Color.white)
     }
 }
 

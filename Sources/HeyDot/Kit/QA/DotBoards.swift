@@ -42,7 +42,6 @@ enum DotBoards {
 
     static func renderAll(into dir: URL) throws {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let base = DotDesign(shape: .circle, color: .violet)
         try write(board("Shapes (default colour, oval eyes)", columns: 4) {
             ForEach(DotShape.allCases) { shape in Cell(design: DotDesign(shape: shape), label: shape.label) }
         }, to: dir.appendingPathComponent("dot-shapes.png"))
@@ -74,7 +73,6 @@ enum DotBoards {
             }
         }, to: dir.appendingPathComponent("dot-colors.png"))
         try write(logoBoard(), to: dir.appendingPathComponent("logo-board.png"))
-        _ = base
     }
 
     // MARK: Fit QA

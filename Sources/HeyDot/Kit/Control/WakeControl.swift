@@ -4,30 +4,30 @@ import Foundation
 ///
 ///     HeyDot --control status|pause [--until ISO8601]|resume [--json]
 ///     HeyDot --control-ssh      (SSH forced command: runs only an allowed verb from $SSH_ORIGINAL_COMMAND)
-public enum WakeControl {
-    public enum Verb: Equatable, Sendable {
+enum WakeControl {
+    enum Verb: Equatable, Sendable {
         case status
         case pause(until: Date?)
         case resume
     }
 
-    public struct Command: Equatable, Sendable {
-        public var verb: Verb
-        public var json: Bool
+    struct Command: Equatable, Sendable {
+        var verb: Verb
+        var json: Bool
     }
 
-    public enum Failure: Error, Equatable, CustomStringConvertible {
+    enum Failure: Error, Equatable, CustomStringConvertible {
         case usage(String)
         case refused(String)
-        public var description: String {
+        var description: String {
             switch self { case .usage(let m), .refused(let m): m }
         }
     }
 
-    public static let usage = "usage: HeyDot --control status|pause [--until ISO8601]|resume [--json]"
+    static let usage = "usage: HeyDot --control status|pause [--until ISO8601]|resume [--json]"
 
     /// Parses the words after `--control`.
-    public static func parse(_ words: [String], now: Date = Date()) -> Result<Command, Failure> {
+    static func parse(_ words: [String], now: Date = Date()) -> Result<Command, Failure> {
         var words = words
         var json = false
         if words.last == "--json" { json = true; words.removeLast() }
@@ -49,7 +49,7 @@ public enum WakeControl {
     /// `resume`, each with an optional `--json`, after an optional `<path>/HeyDot --control` prefix (the
     /// client's configured command, never executed). Any shell syntax, other verb or no command at all
     /// (an interactive login) is refused.
-    public static func sshWords(_ original: String?) -> Result<[String], Failure> {
+    static func sshWords(_ original: String?) -> Result<[String], Failure> {
         let refused = Failure.refused("only `status`, `pause [--until ISO8601]` and `resume` (optionally `--json`) are allowed")
         guard let original, !original.isEmpty,
               original.unicodeScalars.allSatisfy({ allowedScalars.contains($0) }) else { return .failure(refused) }
@@ -70,7 +70,7 @@ public enum WakeControl {
         #"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})?$"#
 
     /// ISO 8601 date and time, to the minute or second; local time when it has no offset.
-    public static func parseTime(_ text: String, timeZone: TimeZone = .current) -> Date? {
+    static func parseTime(_ text: String, timeZone: TimeZone = .current) -> Date? {
         guard let match = try? Regex(timePattern).wholeMatch(in: text) else { return nil }
         func int(_ i: Int) -> Int? { (match.output[i].substring).flatMap { Int($0) } }
         var zone = timeZone
@@ -92,7 +92,7 @@ public enum WakeControl {
         return date
     }
 
-    public static func format(_ date: Date, timeZone: TimeZone = .current) -> String {
+    static func format(_ date: Date, timeZone: TimeZone = .current) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.timeZone = timeZone
         return formatter.string(from: date)

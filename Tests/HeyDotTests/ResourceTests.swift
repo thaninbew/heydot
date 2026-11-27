@@ -1,7 +1,8 @@
-import AppKit
 import AVFoundation
+import AppKit
 import CoreAudio
 import Darwin
+import Foundation
 import SwiftUI
 import Testing
 import WebKit
@@ -108,6 +109,26 @@ import WebKit
     #expect(weakUsage == nil)
 }
 
+@MainActor @Test func listenerUsageIsListenerCPUPerWallSecond() {
+    let usage = ListenerUsage()
+    var cpu = 10.0, wall = 100.0
+    usage.cpuSeconds = { cpu }; usage.uptime = { wall }; usage.bytes = { 18 * 1_048_576 }
+    usage.sample()
+    cpu = 10.008; wall = 102
+    usage.sample()
+    #expect(abs((usage.latest?.cpu ?? 0) - 0.4) < 0.0001)
+    #expect(usage.latest?.megabytes == 18)
+    #expect(ListenerUsage.describe(usage.latest!) == "Listener: 0.4% CPU \u{00B7} ~18 MB")
+}
+
+@Test func listenerMeterCountsOnlyMeasuredWork() {
+    let before = ListenerMeter.cpuSeconds
+    var x = 0.0
+    for i in 0..<2_000_000 { x += sqrt(Double(i)) }  // outside the meter
+    #expect(ListenerMeter.cpuSeconds == before)
+    #expect(x > 0)
+}
+
 @Test func logsAreBoundedIncludingOversizedMessages() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -139,7 +160,6 @@ import WebKit
         #expect(view.navigationDelegate == nil && view.uiDelegate == nil)
     }
 }
-
 
 private final class ResourceCapture: AudioCapturing, @unchecked Sendable {
     let object = NSObject()
@@ -177,7 +197,6 @@ private final class ResourceCapture: AudioCapturing, @unchecked Sendable {
     #expect(inputChanged == nil && captures.allSatisfy { $0.receive == nil })
     #expect(supervisor.restarts == 20)
 }
-
 
 /// Substitute HTML gets one local navigation. Reject backend reloads so the baseline's hang-up and
 /// wake handlers cannot fetch the public site. This delegate exists only in the opt-in fixture.
