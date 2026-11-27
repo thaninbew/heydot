@@ -24,8 +24,7 @@ struct FrostButtonStyle: ButtonStyle {
     /// Draw the accent focus ring (and the caller turns the system one off). A style applied to a whole form
     /// keeps the system ring instead, so text fields in it keep theirs.
     var ownFocusRing = false
-    /// One height for every capsule button in a row, and the width a short label starts from.
-    static let height = Frost.pillHeight
+    /// The width a short pill label starts from.
     static let baseWidth: CGFloat = 132
     func makeBody(configuration: Configuration) -> some View { FrostButtonBody(role: role, ownFocusRing: ownFocusRing, configuration: configuration) }
 }
