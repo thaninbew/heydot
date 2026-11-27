@@ -265,18 +265,22 @@ struct OnboardingView: View {
                     phraseSlots
                     voiceStatus
                     if flow.micStatus == .authorized {
-                        HStack(spacing: 16) { microphoneAccess; microphonePicker }
+                        // Start over shares the microphone row: a row of its own overflows the step while tuning.
+                        HStack(spacing: 16) { microphoneAccess; microphonePicker; if flow.canStartOver { startOver } }
                     } else if flow.micStatus == .denied || flow.micStatus == .restricted {
                         note("Microphone access is off for HeyDot. Turn it on in Privacy & Security.", problem: true)
                     }
                 }
                 .padding(.top, 20)
             }
-            if flow.canStartOver {
-                Button("Start over", action: flow.startOver).frostButton(.chip)
-                    .help("Clear every sample and tune again").padding(.top, 14)
+            if flow.canStartOver && (flow.calibration != nil || flow.micStatus != .authorized) {
+                startOver.padding(.top, 14)
             }
         }
+    }
+
+    var startOver: some View {
+        Button("Start over", action: flow.startOver).frostButton(.chip).help("Clear every sample and tune again")
     }
 
     @ViewBuilder var voiceHeading: some View {
