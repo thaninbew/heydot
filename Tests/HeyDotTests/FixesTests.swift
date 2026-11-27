@@ -268,7 +268,7 @@ final class RecordingTuner: VoiceTuner {
 
 @Test func themeIsFrostUntilThereIsADotAndDeterministicAfter() {
     #expect(Theme.forDesign(.default) == Theme.from(palette: [Accent.defaultHex]), "the default logo themes from its coral")
-    let body = DotDesign.default.color.hex, eyes = Accent.ink(for: body)
+    let body = Accent.defaultHex, eyes = Accent.ink(for: body)  // the drawn logo: coral body, same-hue ink eyes
     #expect(DotDesign.default.fill == .colorBody)
     #expect(Accent.contrast(body, eyes) >= 4.4)
     #expect(OKLCH.hueDistance(OKLCH(hex: body).h, OKLCH(hex: eyes).h) < 3)

@@ -93,7 +93,7 @@ enum Accent {
     static func ink(for fill: UInt32) -> UInt32 { OKLCH(l: 0.16, c: 0.02, h: OKLCH(hex: fill).h).hexInGamut }
 
     static func source(for design: DotDesign) -> UInt32 {
-        design.custom != nil || design == .default ? defaultHex : design.color.hex
+        design.custom != nil || design.isLogo ? defaultHex : design.color.hex
     }
 
     static func hex(for design: DotDesign) -> UInt32 { ui(source(for: design)) }

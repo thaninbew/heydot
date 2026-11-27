@@ -121,6 +121,8 @@ enum QARender {
             let muted = NoWeb(); muted.inCall = true; muted.microphoneMuted = true
             try both("popover-in-call-muted") { popover(model(web: muted)) }
             try snapshot(popover(model({ $0 = AppSettings() })), to: out("popover-setup-needed"))
+            try both("popover-microphone-needed") { popover(model(mic: .notDetermined)) }
+            try both("popover-microphone-denied") { popover(model(mic: .denied)) }
             try snapshot(popover(model(signedIn: false)), to: out("popover-sign-in-needed"))
             let inCall = NoWeb(); inCall.inCall = true; inCall.microphoneMuted = false
             try both("popover-in-call") { popover(model(web: inCall)) }

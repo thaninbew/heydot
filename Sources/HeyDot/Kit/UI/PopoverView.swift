@@ -33,6 +33,7 @@ struct PopoverView: View {
             } else if let hint {
                 Text(hint).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
+            microphoneAction
             if showsRecovery { recovery }
             if model.asksForStar, model.lastResult == nil, !model.web.inCall { starCard.transition(.opacity) }
             primary
@@ -92,10 +93,23 @@ struct PopoverView: View {
 
     var hint: String? {
         switch model.status {
+        case .micAccessNeeded: "Enable the microphone to use your wake phrase."
         case .micDenied: "Turn on HeyDot in System Settings > Privacy & Security > Microphone."
         case .signInNeeded: "HeyDot's sign-in to ChatGPT ended."
         case .failed(let message): message
         default: nil
+        }
+    }
+
+    @ViewBuilder var microphoneAction: some View {
+        switch model.status {
+        case .micAccessNeeded:
+            Button("Enable microphone") { Task { await model.requestMicrophoneAccess() } }
+                .frostButton(.chip)
+                .disabled(model.requestingMicrophoneAccess)
+        case .micDenied:
+            Button("Open Privacy Settings", action: model.openMicrophoneSettings).frostButton(.chip)
+        default: EmptyView()
         }
     }
 

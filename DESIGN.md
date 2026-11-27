@@ -42,13 +42,9 @@ Forms apply `FrostButtonStyle(role: .chip)` once to the whole form.
 
 ## Accent
 
-`Accent` derives one colour from the dot's colour: same hue and saturation, lightness moved into the luminance
-band 0.145 to 0.183, where white text on it reads at 4.5:1 and it stands out at 3:1 on light and dark windows.
-Text and marks on a dark window use `Accent.mark` (at least 4.5:1). The default logo, custom avatars and an
-undesigned dot use Frost violet (#7B61FF, adjusted to #6E51FF). It tints the primary pill, focus rings, progress
-dots, tuning rings and ticks, `FrostChoice`, the popover's level bars and listening dot, and option-cell
-selection. The menu bar icon never uses it. Since round 7 the accent is the dot's own colour; see "Theme from dot"
-for labels and marks.
+The HeyDot logo uses coral (#FB817A). Choosing a different dot colour updates the primary button,
+focus rings, progress indicators and popover meter. The Color menu bar option draws the avatar in
+its own colours. The Monochrome option lets macOS tint the template.
 
 ## Theme from dot
 
@@ -56,7 +52,7 @@ for labels and marks.
 dot's own main colour, not a blend of its colours.
 
 1. **Palette** from the design data, not pixels: the main colour (the dot body), then the accessory colour when it
-   wears one in a colour (charcoal and brown count as ink). The HeyDot logo follows its violet main colour; imported avatars keep
+   wears one in a colour (charcoal and brown count as ink). The HeyDot logo follows its coral main colour; imported avatars keep
    Frost exactly.
 2. **Accent = the main colour itself** (`Accent.pill`). It is nudged in lightness only when it would vanish into a
    window: under 1.15:1 against the light window (near-white) or 1.3:1 against the dark one (near-black).
@@ -100,9 +96,9 @@ shortcuts work in every HeyDot window.
 ## Open-cradle logo
 
 The default mic uses round 3’s owner-selected “8. Open cradle” geometry on the same 96-unit grid.
-The flat violet body uses same-family eyes derived with `Accent.ink`; menu bar templates use
+The flat coral body uses same-family eyes derived with `Accent.ink`; menu bar templates use
 wider-set 10-unit eye holes and a 4-unit gutter. The welcome and default tiles use the designer’s
-original violet glass PNG, embedded in the executable so signed assembly needs no resource bundle.
+coral glass PNG, embedded in the executable so signed assembly needs no resource bundle.
 
 `Kit/Resources/Logo8_{1024,32,16}.png` come from the marketing design’s
 `logos-r3/r8-open-cradle/icon-{1024,32,16}.png` (generator `src/r3-mic.mjs`).

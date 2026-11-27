@@ -33,12 +33,8 @@ struct DotMakerView: View {
                         VStack(alignment: .leading, spacing: 22) {
                             if showCustom { custom.id("custom") }
                             group("Shape") {
-                                grid(DotShape.allCases, selected: drawn && draft.signature == nil ? draft.shape : nil,
-                                     label: \.label) { shape in
-                                    var d = draft; d.shape = shape; d.signature = nil; d.custom = nil; return d
-                                } apply: { shape in
-                                    draft.shape = shape; draft.signature = nil; draft.custom = nil
-                                }
+                                grid(ShapeChoice.all, selected: ShapeChoice(draft), label: \.label) { $0.applied(to: draft) }
+                                    apply: { draft = $0.applied(to: draft) }
                             }
                             group("Color") { swatches(DotColor.faceColors, selected: draft.color) { draft.color = $0 } }
                             group("Eyes") {
@@ -72,7 +68,7 @@ struct DotMakerView: View {
                 }
                 Divider()
                 HStack(spacing: Frost.Space.m) {
-                    Button("Reset to HeyDot") { draft = DotDesign.default }.frostButton(.chip)
+                    Button("Reset to HeyDot") { draft = draft.logo }.frostButton(.chip)
                     Spacer()
                     Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction).frostButton(.secondary)
                     Button("Save") { onSave(draft, menuBarIcon) }.keyboardShortcut(.defaultAction).frostButton(.primary)
@@ -216,6 +212,34 @@ struct DotMakerView: View {
                 .accessibilityLabel(color.label)
                 .accessibilityAddTraits(color == selected ? .isSelected : [])
             }
+        }
+    }
+}
+
+/// The Shape row: the HeyDot logo first, then the drawn shapes.
+enum ShapeChoice: Hashable, Identifiable {
+    case heyDot, shape(DotShape)
+    static let all: [ShapeChoice] = [.heyDot] + DotShape.allCases.map(ShapeChoice.shape)
+
+    /// The choice the design shows: HeyDot for the logo's mic (also once restyled), nil for an imported avatar.
+    init?(_ design: DotDesign) {
+        guard design.custom == nil else { return nil }
+        switch design.signature {
+        case nil: self = .shape(design.shape)
+        case .mic: self = .heyDot
+        default: return nil
+        }
+    }
+
+    var id: String { if case .shape(let s) = self { s.rawValue } else { "heyDot" } }
+    var label: String { if case .shape(let s) = self { s.label } else { "HeyDot" } }
+
+    /// HeyDot brings back the whole logo; a shape keeps the rest of the design. Both keep the nickname.
+    func applied(to design: DotDesign) -> DotDesign {
+        switch self {
+        case .heyDot: return design.logo
+        case .shape(let shape):
+            var d = design; d.shape = shape; d.signature = nil; d.custom = nil; return d
         }
     }
 }

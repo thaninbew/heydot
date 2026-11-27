@@ -36,7 +36,7 @@ It's free, open source, and has no account, server or API key of its own. If Hey
 - **Wake-word listening on your Mac.** The phrase is spotted on device by a small keyword model. That audio is never uploaded.
 - **Out of the way.** A menu bar icon, no Dock icon. Pause for 15 minutes, an hour or until tomorrow. The microphone is released while your display sleeps or the Mac is locked.
 - **Your mic, not whatever's default.** It uses the built-in microphone unless you pick another, so it won't grab your AirPods mid FaceTime.
-- **Your dot, your colours.** Give it a shape, colour and eyes, and the whole app themes itself around it.
+- **Your dot, your colours.** Choose the coral HeyDot microphone or give your dot its own shape, colour and eyes. The whole app follows its colours.
 - **Updates itself.** HeyDot asks before it checks this repo for new versions, and installs them only when they carry the project's signature.
 
 ## Requirements
@@ -54,7 +54,7 @@ Prefer not to run a downloaded build? [Build it yourself](#build-from-source) in
 
 ## How it works
 
-1. **Listening.** HeyDot captures 16 kHz audio from one chosen microphone and runs it through an on-device [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) keyword spotter tuned to your phrase. Nothing is recorded or sent anywhere while it waits.
+1. **Listening.** HeyDot captures 16 kHz audio from one chosen microphone and runs it through an on-device [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) keyword spotter tuned to your phrase. HeyDot processes wake-word audio in memory. It never saves or uploads that audio.
 2. **Waking.** When it hears your phrase, it opens your dot's page in a built-in, hidden ChatGPT web view (signed in once, by you) and presses its call button for you.
 3. **Talking.** From there it's a normal ChatGPT voice call: your call audio goes to ChatGPT, just as it does in the ChatGPT app. Hang up or mute from the menu bar.
 

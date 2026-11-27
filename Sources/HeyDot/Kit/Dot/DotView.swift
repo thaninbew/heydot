@@ -73,7 +73,9 @@ public struct DotView: View {
     }
 
     static func palette(_ d: DotDesign, _ style: DotStyle) -> (LayerRole) -> Color? {
-        let accent = d.color.color
+        // The logo drawn as a vector (menu bar, option cells) takes the PNG's coral, not the nearest palette colour.
+        let accentHex = d.isLogo ? Accent.defaultHex : d.color.hex
+        let accent = Color(hex: accentHex)
         // Charcoal is the one-colour accessory: it matches the ink, and turns white on a dark tile
         // (the flat vector tile variant), so Tray's headphones stay visible everywhere.
         let accessory = d.accessoryColor != .charcoal ? d.accessoryColor.color
@@ -89,7 +91,7 @@ public struct DotView: View {
             }
         case .standard, .inverted:
             let body = colorBody ? accent : (style == .inverted ? DotInk.paper : DotInk.ink)
-            let feature = colorBody ? (d.signature == .mic ? Color(hex: Accent.ink(for: d.color.hex)) : DotInk.ink) : accent
+            let feature = colorBody ? (d.signature == .mic ? Color(hex: Accent.ink(for: accentHex)) : DotInk.ink) : accent
             let line = style == .inverted && !colorBody ? DotInk.paper : DotInk.ink
             return { role in
                 switch role {
@@ -117,7 +119,7 @@ public struct DotTile: View {
     }
 
     public var body: some View {
-        if design == .default {
+        if design.isLogo {
             // The icon has 100 units of transparent inset on Apple's 1024 grid.
             Image(nsImage: LogoAsset.image).resizable().interpolation(.high)
                 .frame(width: size * 1024 / 824, height: size * 1024 / 824)

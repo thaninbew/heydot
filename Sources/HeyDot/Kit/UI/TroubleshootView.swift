@@ -113,11 +113,14 @@ final class Troubleshooter: ObservableObject {
     // MARK: Fixes
 
     func allowMicrophone() {
-        app.hooks.requestMicrophone { _ in Task { @MainActor [weak self] in self?.retry(.microphoneAccess) } }
+        Task { [weak self, app] in
+            await app.requestMicrophoneAccess()
+            self?.retry(.microphoneAccess)
+        }
     }
 
     func openPrivacySettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
+        app.openMicrophoneSettings()
     }
 
     func resume() { app.resume(); retry(.listening) }
@@ -313,6 +316,7 @@ struct TroubleshootView: View {
             switch problem {
             case .micNotAsked:
                 fix("Allow microphone", primary: true, action: doctor.allowMicrophone)
+                    .disabled(model.requestingMicrophoneAccess)
             case .micDenied:
                 fix("Open Privacy Settings", primary: true, action: doctor.openPrivacySettings)
                 fix("Check again") { doctor.retry(step) }

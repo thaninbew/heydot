@@ -1,4 +1,3 @@
-import AppKit
 import AVFoundation
 import CoreAudio
 import SwiftUI
@@ -222,9 +221,18 @@ final class OnboardingModel: ObservableObject {
     }
 
     private func complete() {
-        let loginChoice = step == .done ? launchAtLogin : nil
-        guard app.saveOnboarding(launchAtLogin: loginChoice) else { return }
-        if loginChoice != nil { applyLogin() }
+        guard app.saveSetup() else { return }
+        if step == .done {
+            do {
+                try app.hooks.setLaunchAtLogin(launchAtLogin)
+                loginError = nil
+            } catch {
+                loginError = error.localizedDescription
+                return
+            }
+            let enabled = app.hooks.launchAtLoginEnabled()
+            guard app.saveSetup({ $0.launchAtLogin = enabled; $0.onboarded = true }) else { return }
+        }
         leave(step)
         finish()
     }
@@ -267,22 +275,20 @@ final class OnboardingModel: ObservableObject {
     // MARK: Microphone
 
     func requestMicrophone() {
-        app.hooks.requestMicrophone { _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.micStatus = self.app.hooks.microphoneStatus()
-            }
+        Task { [weak self, app] in
+            await app.requestMicrophoneAccess()
+            self?.refreshMicrophone()
         }
     }
 
     /// Re-reads the permission (on entering the step and whenever HeyDot becomes active again, such as after
-    /// System Settings); starts tuning once it is allowed. Nothing assumes a grant.
+    /// System Settings).
     func refreshMicrophone() {
         micStatus = app.hooks.microphoneStatus()
     }
 
     func openPrivacySettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
+        app.openMicrophoneSettings()
     }
 
     // MARK: Voice tuning
@@ -310,13 +316,14 @@ final class OnboardingModel: ObservableObject {
 
     /// The Start button (and Try again after a miss).
     func startListening() {
-        guard micStatus == .authorized else { return }
-        tuningStarted = true
         startTuning()
     }
 
-    func startTuning() {
+    private func startTuning() {
+        refreshMicrophone()
+        guard micStatus == .authorized else { return }
         stopTuning()
+        tuningStarted = true
         // The live engine shares the mic; pause it so a "Hey <name>" here can't start a real call.
         if app.engine.isListening { app.engine.stop() }
         tuneError = nil; problem = nil; soundHeard = false; listenStart = now()
@@ -531,15 +538,6 @@ final class OnboardingModel: ObservableObject {
     }
 
     // MARK: Done
-
-    private func applyLogin() {
-        do {
-            try app.hooks.setLaunchAtLogin(launchAtLogin)
-            loginError = nil
-        } catch {
-            loginError = "macOS didn't accept the login item: \(error.localizedDescription)"
-        }
-    }
 
     func startTest() {
         heard = false
