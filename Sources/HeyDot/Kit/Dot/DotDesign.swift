@@ -2,11 +2,11 @@ import SwiftUI
 
 // The dot maker uses original vector artwork in DotGeometry.swift.
 
-public enum DotShape: String, Codable, CaseIterable, Sendable, Identifiable {
+enum DotShape: String, Codable, CaseIterable, Sendable, Identifiable {
     case circle, roundedTriangle, capsule, roundedHeadTwoEars, sixLobedFlower, heart, fourLobedButterfly,
          circleTwoEars, twelveScallopedRosette, hexagon, roundedDiamond
-    public var id: String { rawValue }
-    public var label: String {
+    var id: String { rawValue }
+    var label: String {
         switch self {
         case .circle: "Circle"
         case .roundedTriangle: "Rounded triangle"
@@ -23,15 +23,15 @@ public enum DotShape: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 }
 
-public enum DotColor: String, Codable, CaseIterable, Sendable, Identifiable {
+enum DotColor: String, Codable, CaseIterable, Sendable, Identifiable {
     case pink, orchid, violet, blue, cyan, teal, lime, yellow, coral
     case charcoal, brown  // accessory colours only
-    public var id: String { rawValue }
-    public static let faceColors: [DotColor] = [.pink, .orchid, .violet, .blue, .cyan, .teal, .lime, .yellow, .coral]
-    public static let accessoryColors: [DotColor] = faceColors + [.charcoal, .brown]
-    public var label: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
+    var id: String { rawValue }
+    static let faceColors: [DotColor] = [.pink, .orchid, .violet, .blue, .cyan, .teal, .lime, .yellow, .coral]
+    static let accessoryColors: [DotColor] = faceColors + [.charcoal, .brown]
+    var label: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
     /// Our palette. The available face and accessory colours.
-    public var hex: UInt32 {
+    var hex: UInt32 {
         switch self {
         case .pink: 0xFF5FA2
         case .orchid: 0xD65CF0
@@ -46,13 +46,13 @@ public enum DotColor: String, Codable, CaseIterable, Sendable, Identifiable {
         case .brown: 0x8C5A3C
         }
     }
-    public var color: Color { Color(hex: hex) }
+    var color: Color { Color(hex: hex) }
 }
 
-public enum DotEyes: String, Codable, CaseIterable, Sendable, Identifiable {
+enum DotEyes: String, Codable, CaseIterable, Sendable, Identifiable {
     case sweptLids, oval, sparkleCapsules, highlightCapsules, dots, roundHighlights, crescentInset, sleepyLids
-    public var id: String { rawValue }
-    public var label: String {
+    var id: String { rawValue }
+    var label: String {
         switch self {
         case .sweptLids: "Swept lids"
         case .oval: "Oval"
@@ -66,10 +66,10 @@ public enum DotEyes: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 }
 
-public enum DotGlasses: String, Codable, CaseIterable, Sendable, Identifiable {
+enum DotGlasses: String, Codable, CaseIterable, Sendable, Identifiable {
     case none, monocle, tallOvalFrames, separateTrapezoidLenses, classicSunglasses, roundSunglasses
-    public var id: String { rawValue }
-    public var label: String {
+    var id: String { rawValue }
+    var label: String {
         switch self {
         case .none: "None"
         case .monocle: "Monocle"
@@ -81,10 +81,10 @@ public enum DotGlasses: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 }
 
-public enum DotAccessory: String, Codable, CaseIterable, Sendable, Identifiable {
+enum DotAccessory: String, Codable, CaseIterable, Sendable, Identifiable {
     case none, headphones, bowTie, beanie, hat, beret, bulb, tuft, crown
-    public var id: String { rawValue }
-    public var label: String {
+    var id: String { rawValue }
+    var label: String {
         switch self {
         case .none: "None"
         case .headphones: "Headphones"
@@ -101,31 +101,31 @@ public enum DotAccessory: String, Codable, CaseIterable, Sendable, Identifiable 
 
 /// Hand-authored bodies that sit outside the shape list: the HeyDot logo, earlier logo candidates,
 /// and the v2 logo candidates (LogoV2.swift, review board only).
-public enum DotSignature: String, Codable, CaseIterable, Sendable {
+enum DotSignature: String, Codable, CaseIterable, Sendable {
     case hey, heyWave, heyBubble
     case exclaim, perk, callOut, mic, sunrise
 }
 
 /// How Color is applied. flat vector default: ink body, colour in the eyes. Optional: colour body, ink eyes.
-public enum DotFill: String, Codable, CaseIterable, Sendable {
+enum DotFill: String, Codable, CaseIterable, Sendable {
     case inkBody, colorBody
 }
 
-public struct DotDesign: Codable, Equatable, Hashable, Sendable {
-    public var shape: DotShape = .circle
-    public var color: DotColor = .violet
-    public var eyes: DotEyes = .oval
-    public var glasses: DotGlasses = .none
-    public var accessory: DotAccessory = .none
-    public var accessoryColor: DotColor = .charcoal
-    public var nickname: String = ""
-    public var fill: DotFill = .colorBody
+struct DotDesign: Codable, Equatable, Hashable, Sendable {
+    var shape: DotShape = .circle
+    var color: DotColor = .violet
+    var eyes: DotEyes = .oval
+    var glasses: DotGlasses = .none
+    var accessory: DotAccessory = .none
+    var accessoryColor: DotColor = .charcoal
+    var nickname: String = ""
+    var fill: DotFill = .colorBody
     /// When set, the body is a hand-authored mark instead of `shape`. Picking a shape clears it.
-    public var signature: DotSignature?
+    var signature: DotSignature?
     /// An imported avatar drawn instead of the dot (Design your dot > Custom avatar). Picking a shape clears it.
-    public var custom: CustomArt?
+    var custom: CustomArt?
 
-    public init(shape: DotShape = .circle, color: DotColor = .violet, eyes: DotEyes = .oval, glasses: DotGlasses = .none,
+    init(shape: DotShape = .circle, color: DotColor = .violet, eyes: DotEyes = .oval, glasses: DotGlasses = .none,
                 accessory: DotAccessory = .none, accessoryColor: DotColor = .charcoal, nickname: String = "",
                 fill: DotFill = .colorBody, signature: DotSignature? = nil, custom: CustomArt? = nil) {
         self.shape = shape; self.color = color; self.eyes = eyes; self.glasses = glasses; self.accessory = accessory
@@ -135,21 +135,21 @@ public struct DotDesign: Codable, Equatable, Hashable, Sendable {
 
     /// The HeyDot logo: the dot as a microphone head in its cradle ("8. Open cradle", picked from the round-3 board).
     /// Coral is the palette colour nearest the logo's own coral, so a dot made from the logo stays coral.
-    public static let `default` = DotDesign(color: .coral, fill: .colorBody, signature: .mic)
+    static let `default` = DotDesign(color: .coral, fill: .colorBody, signature: .mic)
     /// Earlier logos: the sound arcs, the ink mic and 0.2.0's violet mic. Saved designs that look like one load as the logo.
     static let previousLogos = [DotDesign(fill: .inkBody, signature: .hey), DotDesign(fill: .inkBody, signature: .mic),
                                 DotDesign(color: .violet, fill: .colorBody, signature: .mic)]
 
     /// Draws as the HeyDot logo (the designer's PNG on tiles, its coral everywhere else), whatever the nickname.
-    public var isLogo: Bool { custom == nil && withNickname("") == .default }
+    var isLogo: Bool { custom == nil && withNickname("") == .default }
 
     /// The HeyDot logo with this design's nickname.
-    public var logo: DotDesign { DotDesign.default.withNickname(nickname) }
+    var logo: DotDesign { DotDesign.default.withNickname(nickname) }
 
     func withNickname(_ name: String) -> DotDesign { var d = self; d.nickname = name; return d }
 }
 
-public extension Color {
+extension Color {
     init(hex: UInt32, opacity: Double = 1) {
         self.init(.sRGB, red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255,
                   blue: Double(hex & 0xFF) / 255, opacity: opacity)

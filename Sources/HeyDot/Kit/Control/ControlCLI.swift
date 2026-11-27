@@ -1,8 +1,8 @@
 import Foundation
 
-public enum ControlCLI {
+enum ControlCLI {
     /// Handles `--control …` and `--control-ssh`; nil for any other launch (the menu bar app).
-    public static func run(arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment,
+    static func run(arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment,
                            paths: Paths = Paths()) -> Int32? {
         if arguments.dropFirst().first == "--control-ssh" {
             switch WakeControl.sshWords(environment["SSH_ORIGINAL_COMMAND"]) {

@@ -2,8 +2,8 @@ import Foundation
 import Darwin
 
 /// Bounded text log (1 MiB current plus one 1 MiB archive) at ~/Library/Logs/HeyDot.log.
-public final class Log: @unchecked Sendable {
-    public static let shared = Log(url: Paths().log)
+final class Log: @unchecked Sendable {
+    static let shared = Log(url: Paths().log)
 
     private let url: URL
     private let lock = NSLock()
@@ -15,11 +15,11 @@ public final class Log: @unchecked Sendable {
         return formatter
     }()
 
-    public init(url: URL) { self.url = url }
+    init(url: URL) { self.url = url }
 
-    public var location: URL { url }
+    var location: URL { url }
 
-    public func write(_ message: String) {
+    func write(_ message: String) {
         lock.lock(); defer { lock.unlock() }
         let message = String(decoding: message.utf8.prefix(Self.maximumMessageBytes), as: UTF8.self)
         let line = "\(stamp.string(from: Date())) [\(ProcessInfo.processInfo.processIdentifier)] \(message)\n"

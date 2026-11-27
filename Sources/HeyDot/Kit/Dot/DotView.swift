@@ -1,14 +1,14 @@
 import AppKit
 import SwiftUI
 
-public enum DotInk {
-    public static let ink = Color(hex: 0x0A0A0B)
-    public static let paper = Color.white
+enum DotInk {
+    static let ink = Color(hex: 0x0A0A0B)
+    static let paper = Color.white
 }
 
 /// How a dot is painted. `.standard` is the flat vector mark (ink body); `.inverted` is the white body
 /// used on dark tiles; `.template` is solid alpha for the menu bar.
-public enum DotStyle: Sendable { case standard, inverted, template }
+enum DotStyle: Sendable { case standard, inverted, template }
 
 @MainActor
 enum DotCache {
@@ -26,16 +26,16 @@ enum DotCache {
 }
 
 /// Vector dot. The same model draws the menu bar glyph, popover avatar, dot maker and app icon.
-public struct DotView: View {
+struct DotView: View {
     let design: DotDesign
     let style: DotStyle
     let gutter: CGFloat
 
-    public init(_ design: DotDesign, style: DotStyle = .standard, gutter: CGFloat = 2.6) {
+    init(_ design: DotDesign, style: DotStyle = .standard, gutter: CGFloat = 2.6) {
         self.design = design; self.style = style; self.gutter = gutter
     }
 
-    public var body: some View {
+    var body: some View {
         if let art = design.custom, let image = Self.avatar(art, style) {
             Image(nsImage: image).resizable().interpolation(.high).aspectRatio(1, contentMode: .fit).accessibilityHidden(true)
         } else {
@@ -108,17 +108,17 @@ public struct DotView: View {
 }
 
 /// A dot on a frosted rounded tile (translucent white, lighter in dark mode) in the dot's own colours.
-public struct DotTile: View {
+struct DotTile: View {
     @Environment(\.colorScheme) private var scheme
     let design: DotDesign
     let size: CGFloat
     var dark: Bool?
 
-    public init(_ design: DotDesign, size: CGFloat, dark: Bool? = nil) {
+    init(_ design: DotDesign, size: CGFloat, dark: Bool? = nil) {
         self.design = design; self.size = size; self.dark = dark
     }
 
-    public var body: some View {
+    var body: some View {
         if design.isLogo {
             // The icon has 100 units of transparent inset on Apple's 1024 grid.
             Image(nsImage: LogoAsset.image).resizable().interpolation(.high)

@@ -3,15 +3,15 @@ import AVFoundation
 import ServiceManagement
 
 /// System side effects the app needs, injectable so previews and QA renders never touch login items or the microphone.
-public struct SystemHooks {
-    public var setLaunchAtLogin: (Bool) throws -> Void
-    public var launchAtLoginEnabled: () -> Bool
-    public var microphoneStatus: () -> AVAuthorizationStatus
-    public var requestMicrophone: (@escaping @Sendable (Bool) -> Void) -> Void
-    public var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
+struct SystemHooks {
+    var setLaunchAtLogin: (Bool) throws -> Void
+    var launchAtLoginEnabled: () -> Bool
+    var microphoneStatus: () -> AVAuthorizationStatus
+    var requestMicrophone: (@escaping @Sendable (Bool) -> Void) -> Void
+    var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
 
     @MainActor
-    public static func live(paths: Paths = Paths()) -> SystemHooks {
+    static func live(paths: Paths = Paths()) -> SystemHooks {
         return SystemHooks(
             setLaunchAtLogin: { on in
                 guard paths.usesSystemData else { return }

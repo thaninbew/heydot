@@ -4,10 +4,10 @@ import ServiceManagement
 import SwiftUI
 import WakeEngine
 
-public enum AppStatus: Equatable {
+enum AppStatus: Equatable {
     case setupNeeded, micAccessNeeded, micDenied, paused, signInNeeded, listening, calling, failed(String)
 
-    public var glyph: GlyphState {
+    var glyph: GlyphState {
         switch self {
         case .listening, .calling: .listening
         case .paused: .paused
@@ -17,39 +17,39 @@ public enum AppStatus: Equatable {
 }
 
 @MainActor
-public final class AppModel: ObservableObject {
-    @Published public private(set) var settings: AppSettings
+final class AppModel: ObservableObject {
+    @Published private(set) var settings: AppSettings
     @Published private var microphoneAccess: AVAuthorizationStatus
     @Published private var microphoneRequest: Task<Void, Never>?
-    @Published public private(set) var engineError: String?
+    @Published private(set) var engineError: String?
     /// The latest call or check result. A success shows briefly and clears itself (`successLifetime`); a problem
     /// stays until a later result replaces it or the user dismisses it. There is only ever one, so repeated
     /// calls replace each other instead of piling up.
-    @Published public private(set) var lastResult: CallResult?
+    @Published private(set) var lastResult: CallResult?
     /// True while a success is fresh: the menu bar glyph shows a check badge for that time.
-    @Published public private(set) var flashing = false
+    @Published private(set) var flashing = false
     var successLifetime: Duration = .seconds(4)
     private var resultExpiry: Task<Void, Never>?
     /// Called after the pause or its end time changes (ControlService re-arms the timed-pause expiry).
     var onPauseChange: (() -> Void)?
     private var stopped = false
     private var lastWakeCall: ContinuousClock.Instant?
-    @Published public private(set) var calling = false
-    @Published public private(set) var checking = false
-    @Published public var settingsError: String?
+    @Published private(set) var calling = false
+    @Published private(set) var checking = false
+    @Published var settingsError: String?
     /// Built-in browser: nil until the page has been read once.
-    @Published public private(set) var webSignedIn: Bool?
+    @Published private(set) var webSignedIn: Bool?
 
-    public let engine: WakeListening
-    public let enroller: WakeEnrolling
-    public let web: WebCalling
-    public let hooks: SystemHooks
+    let engine: WakeListening
+    let enroller: WakeEnrolling
+    let web: WebCalling
+    let hooks: SystemHooks
     let store: SettingsStore?
     let log: Log
     /// While onboarding's live test runs, wakes go here instead of pressing the call button.
     var wakeOverride: ((WakeEvent) -> Void)?
 
-    public init(settings: AppSettings, engine: WakeListening, enroller: WakeEnrolling,
+    init(settings: AppSettings, engine: WakeListening, enroller: WakeEnrolling,
                 web: WebCalling? = nil, hooks: SystemHooks, store: SettingsStore?, log: Log = .shared) {
         self.settings = settings; self.engine = engine; self.enroller = enroller
         self.web = web ?? NoWeb()
@@ -64,7 +64,7 @@ public final class AppModel: ObservableObject {
 
     // MARK: Settings
 
-    public func update(_ change: (inout AppSettings) -> Void) {
+    func update(_ change: (inout AppSettings) -> Void) {
         applySettingsChange(change)
     }
 
@@ -100,7 +100,7 @@ public final class AppModel: ObservableObject {
 
     // MARK: Status
 
-    public var status: AppStatus {
+    var status: AppStatus {
         if !settings.onboarded || settings.dotURL == nil { return .setupNeeded }
         if microphoneAccess == .notDetermined { return .micAccessNeeded }
         if microphoneAccess != .authorized { return .micDenied }
@@ -112,7 +112,7 @@ public final class AppModel: ObservableObject {
         return .listening
     }
 
-    public var statusLine: String {
+    var statusLine: String {
         switch status {
         case .setupNeeded: "Set up needed"
         case .micAccessNeeded: "Microphone access needed"
@@ -131,11 +131,11 @@ public final class AppModel: ObservableObject {
             : date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
 
-    public var displayName: String { settings.design.nickname.isEmpty ? settings.dotName : settings.design.nickname }
+    var displayName: String { settings.design.nickname.isEmpty ? settings.dotName : settings.design.nickname }
 
     // MARK: Listening
 
-    public func stop() {
+    func stop() {
         stopped = true
         keepAlive?.cancel(); keepAlive = nil
         resultExpiry?.cancel(); resultExpiry = nil
@@ -144,7 +144,7 @@ public final class AppModel: ObservableObject {
         web.endCall()
     }
 
-    public func refreshListening() {
+    func refreshListening() {
         refreshListening(access: hooks.microphoneStatus())
     }
 
@@ -220,7 +220,7 @@ public final class AppModel: ObservableObject {
     /// Bumped by `reloadWeb` so a call still waiting on the old page can't overwrite what follows it.
     private var callEpoch = 0
 
-    public func call(wakeAt: Date = Date()) async {
+    func call(wakeAt: Date = Date()) async {
         guard !stopped, !calling, !web.inCall else { return }
         calling = true
         let mine = callEpoch
@@ -237,7 +237,7 @@ public final class AppModel: ObservableObject {
 
     /// The popover's Reload: drops the hidden page (and a call stuck waiting on it), then loads it fresh and
     /// re-reads sign-in.
-    public func reloadWeb() {
+    func reloadWeb() {
         log.write("web: reload from the menu")
         callEpoch += 1
         calling = false
@@ -247,9 +247,9 @@ public final class AppModel: ObservableObject {
     }
 
     /// The popover's Call now: the same fail-closed press as a wake, and it works while listening is paused.
-    public var canCallNow: Bool { settings.onboarded && settings.dotURL != nil && !calling && !web.inCall && !checking }
+    var canCallNow: Bool { settings.onboarded && settings.dotURL != nil && !calling && !web.inCall && !checking }
 
-    public func callNow() async {
+    func callNow() async {
         guard canCallNow else { return }
         log.write("call: started from the menu")
         await call()
@@ -263,7 +263,7 @@ public final class AppModel: ObservableObject {
         return result
     }
 
-    public func checkCallButton() async {
+    func checkCallButton() async {
         guard let url = settings.dotURL else { lastResult = CallResult(outcome: "no-dot"); return }
         checking = true
         show(await check(dotURL: url))
@@ -290,7 +290,7 @@ public final class AppModel: ObservableObject {
     // MARK: Built-in browser
 
     /// Keeps the dot page loaded in the hidden view and re-reads sign-in state.
-    public func warmWeb() {
+    func warmWeb() {
         web.warm(dotURL: settings.dotURL)
         Task { await refreshWebState() }
     }
@@ -308,7 +308,7 @@ public final class AppModel: ObservableObject {
     var keepAliveInterval: Duration = .seconds(4 * 3600)
     private var keepAlive: Task<Void, Never>?
 
-    public func startKeepAlive() {
+    func startKeepAlive() {
         keepAlive?.cancel()
         let interval = keepAliveInterval
         keepAlive = Task { [weak self] in
@@ -320,17 +320,17 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    public func showSignIn() {
+    func showSignIn() {
         web.showChatGPT(pickingDot: false) { [weak self] _ in Task { await self?.refreshWebState() } }
     }
 
-    public func endCall() { web.endCall() }
+    func endCall() { web.endCall() }
 
     /// WebKit owns the page's microphone and reports its real mute state.
-    public var canMute: Bool { web.inCall && web.microphoneMuted != nil }
-    public var muted: Bool { web.microphoneMuted == true }
+    var canMute: Bool { web.inCall && web.microphoneMuted != nil }
+    var muted: Bool { web.microphoneMuted == true }
 
-    public func setMuted(_ on: Bool) async {
+    func setMuted(_ on: Bool) async {
         if await !web.setMicrophoneMuted(on) {
             show(CallResult(outcome: "mute-failed", message: on ? "Couldn't mute the call's microphone. It is still on."
                                                                 : "Couldn't unmute the call's microphone."))
@@ -338,12 +338,12 @@ public final class AppModel: ObservableObject {
         objectWillChange.send()
     }
 
-    public func signOutWeb() async {
+    func signOutWeb() async {
         await web.signOut()
         webSignedIn = false
     }
 
-    public func togglePause() { update { $0.paused.toggle(); $0.pausedUntil = nil } }
+    func togglePause() { update { $0.paused.toggle(); $0.pausedUntil = nil } }
 
     /// The next time the clock reads the user's morning time (`morningMinutes`, default 8:00 AM): later today
     /// when that is still ahead (a pause just after midnight), otherwise tomorrow.
@@ -383,7 +383,7 @@ public final class AppModel: ObservableObject {
         if star { hooks.openURL(Self.repository) }
     }
 
-    public func clearResult() { resultExpiry?.cancel(); lastResult = nil; flashing = false }
+    func clearResult() { resultExpiry?.cancel(); lastResult = nil; flashing = false }
 
     /// Shows one result, replacing whatever was there. Successes expire on their own.
     func show(_ result: CallResult) {

@@ -2,13 +2,13 @@ import Foundation
 
 extension Paths {
     /// The app's control socket (0600, in the 0700 run directory), served while the menu bar app runs.
-    public var controlSocket: URL { runDirectory.appendingPathComponent("control.sock") }
+    var controlSocket: URL { runDirectory.appendingPathComponent("control.sock") }
 }
 
 extension AppModel {
     /// What `--control status` reports. `wake` is "on" while the engine listens for the phrase, "off" while
     /// paused, and null otherwise (setup needed, microphone off, engine failed).
-    public var controlState: JSONValue {
+    var controlState: JSONValue {
         let wake: JSONValue = settings.paused ? "off"
             : (engine.isListening && settings.onboarded && settings.dotURL != nil ? "on" : .null)
         let state: String = switch status {
@@ -26,9 +26,9 @@ extension AppModel {
     }
 
     /// Pauses listening; with `until`, the app resumes by itself then (see `ControlService`).
-    public func pause(until: Date?) { update { $0.paused = true; $0.pausedUntil = until } }
+    func pause(until: Date?) { update { $0.paused = true; $0.pausedUntil = until } }
 
-    public func resume() { update { $0.paused = false } }
+    func resume() { update { $0.paused = false } }
 
     /// Ends a timed pause whose time has come. A later untimed or re-timed pause is left alone.
     func resumeIfDue(now: Date = Date()) {
@@ -39,13 +39,13 @@ extension AppModel {
 /// Serves `--control` requests from the running app and runs the timed-pause expiry.
 /// One instance per app process; `stop()` closes the socket.
 @MainActor
-public final class ControlService {
+final class ControlService {
     private let model: AppModel
     private let server: ControlSocket.Server
     private var expiry: DispatchWorkItem?
     private var stopped = false
 
-    public init(model: AppModel, paths: Paths = Paths()) throws {
+    init(model: AppModel, paths: Paths = Paths()) throws {
         self.model = model
         server = try ControlSocket.Server(socket: paths.controlSocket)
         let server = server
@@ -92,7 +92,7 @@ public final class ControlService {
         DispatchQueue.main.asyncAfter(wallDeadline: .now() + max(0, until.timeIntervalSinceNow), execute: work)
     }
 
-    public func stop() {
+    func stop() {
         stopped = true
         model.onPauseChange = nil
         expiry?.cancel(); expiry = nil

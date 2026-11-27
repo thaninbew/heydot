@@ -2,7 +2,7 @@ import Foundation
 
 /// The private control socket for status, pause and resume requests: one JSON line in, one JSON line out.
 /// The socket lives in a 0700 directory and is created 0600, so only this user can reach it.
-public enum ControlSocket {
+enum ControlSocket {
     static let maxLine = 64 * 1024
 
     private static func address(_ path: String) -> sockaddr_un? {
@@ -67,16 +67,16 @@ public enum ControlSocket {
 
     // MARK: Server (app side)
 
-    public final class Server: @unchecked Sendable {
+    final class Server: @unchecked Sendable {
         private let fd: Int32
-        public let path: String
+        let path: String
         private let state = NSLock()
         private var closed = false
         private var clients: Set<Int32> = []
         private let workers = DispatchSemaphore(value: 8)
 
         /// Binds the socket, replacing a stale one. `directory` is created or tightened to 0700.
-        public init(socket: URL) throws {
+        init(socket: URL) throws {
             path = socket.path
             // A peer that hangs up yields EPIPE, never a process-killing SIGPIPE.
             signal(SIGPIPE, SIG_IGN)
@@ -98,7 +98,7 @@ public enum ControlSocket {
 
         /// Accepts connections forever on the calling thread; each request is answered on its own thread
         /// so one slow peer never blocks another control request.
-        public func serve(_ handle: @escaping @Sendable (JSONValue) -> JSONValue) {
+        func serve(_ handle: @escaping @Sendable (JSONValue) -> JSONValue) {
             state.lock()
             let listener = closed ? -1 : dup(fd)
             state.unlock()
@@ -139,7 +139,7 @@ public enum ControlSocket {
             }
         }
 
-        public func close() {
+        func close() {
             state.lock()
             defer { state.unlock() }
             guard !closed else { return }
@@ -154,7 +154,7 @@ public enum ControlSocket {
     // MARK: Client (CLI side)
 
     /// Sends one request to the running app. `no-helper` means the app is not running.
-    public static func request(_ message: JSONValue, socket: URL = Paths().controlSocket, timeout: TimeInterval = 40) -> JSONValue {
+    static func request(_ message: JSONValue, socket: URL = Paths().controlSocket, timeout: TimeInterval = 40) -> JSONValue {
         let noHelper: JSONValue = ["outcome": "no-helper", "error": "HeyDot is not running"]
         guard var addr = address(socket.path) else { return noHelper }
         let fd = Foundation.socket(AF_UNIX, SOCK_STREAM, 0)
@@ -181,7 +181,7 @@ public enum ControlSocket {
     }
 
     /// True when the app is accepting connections. Sends no request.
-    public static func isHelperRunning(socket: URL = Paths().controlSocket) -> Bool {
+    static func isHelperRunning(socket: URL = Paths().controlSocket) -> Bool {
         guard var addr = address(socket.path) else { return false }
         let fd = Foundation.socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }

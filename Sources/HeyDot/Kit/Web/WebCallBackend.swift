@@ -13,7 +13,7 @@ import WebKit
 ///   for the microphone, and only while a call is being placed or running. The panel leaves the screen when
 ///   the page's microphone capture ends.
 @MainActor
-public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, WKUIDelegate, NSWindowDelegate {
+final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, WKUIDelegate, NSWindowDelegate {
     static let label = "Start call"
 
     let log: Log
@@ -33,11 +33,11 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     private var callTimeout: Task<Void, Never>?
     private var micWasOn = false
     private var erasing = false
-    public private(set) var inCall = false
-    public var onCallChange: ((String?) -> Void)?
+    private(set) var inCall = false
+    var onCallChange: ((String?) -> Void)?
 
     /// A redirected profile uses a transient store unless it supplies a separate fixture store.
-    public init(log: Log = .shared, store: WKWebsiteDataStore? = nil, paths: Paths = Paths()) {
+    init(log: Log = .shared, store: WKWebsiteDataStore? = nil, paths: Paths = Paths()) {
         self.log = log
         self.paths = paths
         self.store = store ?? paths.webStoreID.map { WKWebsiteDataStore(forIdentifier: $0) } ?? .nonPersistent()
@@ -135,7 +135,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         return p
     }
 
-    public func warm(dotURL: String?) {
+    func warm(dotURL: String?) {
         guard !erasing, let dotURL, let url = URL(string: dotURL), url.host == "chatgpt.com" else { return }
         guard !inCall, !placing, !isShowing(url) || loadError != nil else { return }
         log.write("web: warming \(url.path)")
@@ -182,7 +182,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     // MARK: Calls
 
-    public func call(dotURL: String, wakeAt: Date) async -> CallResult {
+    func call(dotURL: String, wakeAt: Date) async -> CallResult {
         guard !erasing else { return CallResult(outcome: "cancelled") }
         guard let target = URL(string: dotURL), target.host == "chatgpt.com" else { return CallResult(outcome: "no-dot") }
         guard !inCall, !placing else { return CallResult(outcome: "disabled", message: CallResult.describe("in-call")) }
@@ -226,7 +226,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         return CallResult(outcome: outcome, wakeToPressMs: ms(end))
     }
 
-    public func check(dotURL: String) async -> CallResult {
+    func check(dotURL: String) async -> CallResult {
         guard !erasing else { return CallResult(outcome: "cancelled") }
         guard let target = URL(string: dotURL), target.host == "chatgpt.com" else { return CallResult(outcome: "no-dot") }
         if inCall || placing { return CallResult(outcome: "disabled", message: CallResult.describe("in-call")) }
@@ -282,12 +282,12 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     /// WebKit's own capture state for the call page: muted pauses the microphone track the page got from
     /// getUserMedia without ending the call, and WebKit reports it back, so the button always shows the truth.
-    public var microphoneMuted: Bool? {
+    var microphoneMuted: Bool? {
         guard inCall, let state = webView?.microphoneCaptureState, state != .none else { return nil }
         return state == .muted
     }
 
-    public func setMicrophoneMuted(_ muted: Bool) async -> Bool {
+    func setMicrophoneMuted(_ muted: Bool) async -> Bool {
         guard inCall, let view = webView, view.microphoneCaptureState != .none else { return false }
         let want: WKMediaCaptureState = muted ? .muted : .active
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
@@ -309,7 +309,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     }
 
     /// Hangs up by releasing the call page and panel, including media and compositing resources.
-    public func endCall() {
+    func endCall() {
         guard inCall else { return }
         log.write("web: ending the call")
         finishCall(problem: nil)
@@ -318,7 +318,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     /// Bumped by `reset` so a press still polling a dropped page stops and leaves the new state alone.
     private var epoch = 0
 
-    public func reset() {
+    func reset() {
         log.write("web: reset (reloading the page from scratch)")
         epoch += 1
         if inCall { finishCall(problem: nil) }
@@ -329,7 +329,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     // MARK: Sign-in
 
-    public func pageState() async -> WebPageState {
+    func pageState() async -> WebPageState {
         guard !erasing else { return WebPageState(signedIn: nil) }
         pageReaders += 1
         defer { pageReaders -= 1; scheduleIdleUnload() }
@@ -352,7 +352,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     /// A normal visible window on chatgpt.com, sharing the persistent store. The user signs in however
     /// chatgpt.com offers (Google, Apple, email, phone). WebKit's own user agent is left unchanged.
-    public func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {
+    func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {
         guard !erasing else { return }
         signInClosed = onClose
         let enteringPicker = pickingDot && !signInState.pickingDot
@@ -391,7 +391,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         log.write("web: sign-in window opened")
     }
 
-    public func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_ notification: Notification) {
         guard (notification.object as? NSWindow) === signInWindow else { return }
         let picker = signInState.pickingDot ? signInView : nil
         signInView?.stopLoading()
@@ -419,7 +419,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         }
     }
 
-    public func signOut() async {
+    func signOut() async {
         guard !erasing else { return }
         if inCall { endCall() }
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
@@ -427,7 +427,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         if let url = webView?.url { load(url) }
     }
 
-    public func prepareForErase() async {
+    func prepareForErase() async {
         erasing = true
         reset()
         signInClosed = nil
@@ -484,7 +484,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     // MARK: WebKit delegates
 
-    public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                         decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true
         let allowed = Self.allowsNavigation(to: navigationAction.request.url, mainFrame: mainFrame, callView: webView === self.webView)
@@ -501,7 +501,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     /// WebKit SPI (WKNavigationDelegatePrivate). Supplying the WebCrypto master key keeps WebKit away from its
     /// keychain item, so updates don't bring back a password prompt. A WebKit without this falls back to the keychain.
     @objc(_webCryptoMasterKeyForWebView:completionHandler:)
-    public func webCryptoMasterKey(for webView: WKWebView, completionHandler: @escaping (Data?) -> Void) {
+    func webCryptoMasterKey(for webView: WKWebView, completionHandler: @escaping (Data?) -> Void) {
         if cryptoKey == nil {
             let key = store.isPersistent ? WebCryptoKey.load(paths: paths) : WebCryptoKey.generate()
             cryptoKey = .some(key)
@@ -510,13 +510,13 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         completionHandler(cryptoKey ?? nil)
     }
 
-    public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         guard webView === self.webView else { return }
         loadError = error.localizedDescription
         log.write("web: load failed: \(error.localizedDescription)")
     }
 
-    public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let e0 = error as NSError
         if webView === signInView, e0.code != NSURLErrorCancelled, !(e0.domain == "WebKitErrorDomain" && e0.code == 102) {
             signInState.trouble = true  // the sign-in page couldn't load here
@@ -530,7 +530,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         log.write("web: load failed: \(error.localizedDescription)")
     }
 
-    public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         guard webView === self.webView else { return }
         log.write("web: page process ended")
         if inCall { finishCall(problem: CallResult.describe("crashed")) }
@@ -538,7 +538,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     }
 
     /// The microphone, only for chatgpt.com's own top-level page in the call panel, only while placing or in a call.
-    public func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
                         initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
                         decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
         let grant = Self.allowsMicrophone(origin: (origin.protocol, origin.host, origin.port), frameHost: frame.securityOrigin.host,
@@ -556,7 +556,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     }
 
     /// Sign-in popups (Google, Apple) open in a visible child window that shares the configuration.
-    public func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                         for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         guard webView === signInView else { return nil }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 680), styleMask: [.titled, .closable, .resizable],
@@ -572,7 +572,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         return child
     }
 
-    public func webViewDidClose(_ webView: WKWebView) {
+    func webViewDidClose(_ webView: WKWebView) {
         popups.removeAll { window in
             guard window.contentView === webView else { return false }
             window.close(); return true

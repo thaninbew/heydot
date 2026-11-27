@@ -1,17 +1,17 @@
 import Foundation
 
 /// What a press or check attempt meant (`outcome`, from `PageScripts.press` or the backend), in words for the UI.
-public struct CallResult: Sendable, Equatable {
-    public let outcome: String
-    public let message: String
-    public let wakeToPressMs: Int?
+struct CallResult: Sendable, Equatable {
+    let outcome: String
+    let message: String
+    let wakeToPressMs: Int?
 
-    public var pressed: Bool { outcome == "pressed" }
-    public var wouldPress: Bool { outcome == "would-press" }
+    var pressed: Bool { outcome == "pressed" }
+    var wouldPress: Bool { outcome == "would-press" }
 
     /// The one message table for call outcomes, plus the backend's own reasons a call ended (`in-call`,
     /// `no-mic`, `crashed`).
-    public static func describe(_ outcome: String) -> String {
+    static func describe(_ outcome: String) -> String {
         switch outcome {
         case "pressed": "Call started."
         case "would-press": "Ready. HeyDot found your dot's call button and left it alone."
@@ -32,7 +32,7 @@ public struct CallResult: Sendable, Equatable {
         }
     }
 
-    public init(outcome: String, message: String? = nil, wakeToPressMs: Int? = nil) {
+    init(outcome: String, message: String? = nil, wakeToPressMs: Int? = nil) {
         self.outcome = outcome
         self.message = message ?? Self.describe(outcome)
         self.wakeToPressMs = wakeToPressMs

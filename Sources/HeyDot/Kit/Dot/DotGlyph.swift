@@ -2,14 +2,14 @@ import AppKit
 import SwiftUI
 
 /// Menu bar state shown on top of the dot glyph. `ok` is a brief check after a call starts or a check passes.
-public enum GlyphState: Sendable { case listening, paused, attention, ok }
+enum GlyphState: Sendable { case listening, paused, attention, ok }
 
 @MainActor
-public enum DotGlyph {
+enum DotGlyph {
     /// An 18 pt menu bar image of the user's dot. Monochrome is a template image (macOS tints it);
     /// colour is a non-template image in the dot's own colours, drawn for the bar's light or dark
     /// appearance. Paused dims the dot and adds a pause badge; attention adds an orange alert badge.
-    public static func image(_ design: DotDesign, state: GlyphState, points: CGFloat = 18,
+    static func image(_ design: DotDesign, state: GlyphState, points: CGFloat = 18,
                              color: Bool = false, darkBar: Bool = false) -> NSImage {
         let view = GlyphView(design: design, state: state, color: color, darkBar: darkBar).frame(width: points, height: points)
         let renderer = ImageRenderer(content: view)

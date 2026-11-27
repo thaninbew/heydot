@@ -6,24 +6,24 @@ import UniformTypeIdentifiers
 /// An imported avatar. `id` names its images under Application Support/HeyDot/avatars; `silhouette` says the
 /// monochrome menu bar can use its shape (it has a transparent background). Without one, the monochrome
 /// menu bar falls back to the HeyDot logo and Color shows the image.
-public struct CustomArt: Codable, Hashable, Sendable {
-    public var id: String
-    public var silhouette: Bool
-    public init(id: String, silhouette: Bool) { self.id = id; self.silhouette = silhouette }
+struct CustomArt: Codable, Hashable, Sendable {
+    var id: String
+    var silhouette: Bool
+    init(id: String, silhouette: Bool) { self.id = id; self.silhouette = silhouette }
 }
 
 /// Imported avatars, normalised once on import so nothing parses SVG at draw time. Each avatar is three
 /// 512 px PNGs: `<id>.png` (as drawn), `<id>-dark.png` (ink turned white, the flat vector dark-tile rule) and
 /// `<id>-template.png` (the monochrome mask: the art without its `<g id="eyes">`, so eyes read as holes).
 @MainActor
-public enum Avatars {
-    public enum Variant: String { case color = "", dark = "-dark", template = "-template" }
+enum Avatars {
+    enum Variant: String { case color = "", dark = "-dark", template = "-template" }
 
     /// Overridden by QA renders and tests.
     static var directory = Paths().support.appendingPathComponent("avatars", isDirectory: true)
     private static var cache: [String: NSImage] = [:]
 
-    public static func image(_ id: String, _ variant: Variant = .color) -> NSImage? {
+    static func image(_ id: String, _ variant: Variant = .color) -> NSImage? {
         let key = id + variant.rawValue
         if let hit = cache[key] { return hit }
         guard let image = NSImage(contentsOf: directory.appendingPathComponent(key + ".png")) else { return nil }
@@ -33,14 +33,14 @@ public enum Avatars {
 
     // MARK: Import
 
-    public struct Imported: Equatable {
-        public var art: CustomArt
+    struct Imported: Equatable {
+        var art: CustomArt
         /// Plain-language notes for the user (what the menu bar will show, legibility).
-        public var notes: [String]
+        var notes: [String]
     }
 
-    public struct Rejected: Error, Equatable, CustomStringConvertible {
-        public var description: String
+    struct Rejected: Error, Equatable, CustomStringConvertible {
+        var description: String
     }
 
     nonisolated static let side = 512
@@ -50,7 +50,7 @@ public enum Avatars {
     static let svgElements: Set<String> = ["svg", "g", "path", "circle", "ellipse", "rect", "polygon", "polyline", "line", "title", "desc"]
 
     /// Validates, normalises (trims transparent margins, fits a 3/96 margin) and stores an SVG or PNG.
-    public static func importFile(_ url: URL) throws -> Imported {
+    static func importFile(_ url: URL) throws -> Imported {
         let data: Data
         do { data = try Data(contentsOf: url) } catch { throw Rejected(description: "Couldn't read that file.") }
         let isPNG = data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
