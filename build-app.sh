@@ -12,7 +12,7 @@ APP="HeyDot.app"
 [[ "$PREVIEW" != "--preview" ]] || APP="HeyDotPreview.app"
 [[ "$CONFIG" == "debug" || "$CONFIG" == "release" ]] || { echo "Expected debug or release" >&2; exit 64; }
 [[ -z "$PREVIEW" || "$PREVIEW" == "--preview" ]] || { echo "Expected --preview" >&2; exit 64; }
-MODEL=sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01
+source Scripts/model-files.sh
 # Sparkle compares CFBundleVersion, so every release raises HEYDOT_BUILD.
 VERSION="${HEYDOT_VERSION:-0.1.0}"
 BUILD="${HEYDOT_BUILD:-1}"
@@ -21,12 +21,16 @@ FEED_URL="${HEYDOT_FEED_URL:-https://raw.githubusercontent.com/thaninbew/heydot/
 # Verifies every update's EdDSA signature. The private half stays in the maintainer's keychain.
 SPARKLE_PUBLIC_KEY="3Aj+pajIqRlTjpbkGUq4nX027HmsN71RdzQ0SXqQpmA="
 if [[ "$PREVIEW" != "--preview" ]]; then
+  if [[ -n "${HEYDOT_NOTARY_PROFILE:-}" && ( -z "${HEYDOT_VERSION:-}" || -z "${HEYDOT_BUILD:-}" ) ]]; then
+    echo "Set HEYDOT_VERSION and HEYDOT_BUILD explicitly for a notarized build." >&2
+    exit 78
+  fi
   CERT="${HEYDOT_APPROVED_CERT_SHA1:-}"
   [[ "$CERT" =~ ^[[:xdigit:]]{40}$ ]] || { echo "HEYDOT_APPROVED_CERT_SHA1 (40 hex) is required. No ad-hoc fallback. Use --preview for fixtures only." >&2; exit 78; }
   CERT="$(printf '%s' "$CERT" | tr '[:lower:]' '[:upper:]')"
   IDENTITY="$(security find-identity -v -p codesigning | awk -v cert="$CERT" '$2 == cert {print}')"
   [[ -n "$IDENTITY" ]] || { echo "Certificate $CERT is not a valid code signing identity on this Mac." >&2; exit 78; }
-  [[ -s "Vendor/models/$MODEL/tokens.txt" ]] || { echo "Speech model missing: run Scripts/fetch-vendor.sh first." >&2; exit 66; }
+  has_model_files "Vendor/models/$MODEL" || { echo "Speech model missing: run Scripts/fetch-vendor.sh first." >&2; exit 66; }
 fi
 swift build -c "$CONFIG" --product HeyDot
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
@@ -41,18 +45,18 @@ ditto "$BIN_DIR/Sparkle.framework" "$SPARKLE"
 rm -rf "$SPARKLE/XPCServices" "$SPARKLE/Versions/B/XPCServices"
 
 # The keyword model, where the engine looks for it (Resources/models/<model>).
-if [[ -d "Vendor/models/$MODEL" ]]; then
-  mkdir -p "$APP/Contents/Resources/models"
-  # Runtime model inputs and their provenance (no fp32 copies or sample audio).
-  rsync -a --include '*.int8.onnx' --include 'tokens.txt' --include 'bpe.model' --include 'README.md' --exclude '*' \
-    "Vendor/models/$MODEL/" "$APP/Contents/Resources/models/$MODEL/"
+if has_model_files "Vendor/models/$MODEL"; then
+  dest="$APP/Contents/Resources/models/$MODEL"
+  mkdir -p "$dest"
+  for file in "${MODEL_FILES[@]}"; do cp "Vendor/models/$MODEL/$file" "$dest/"; done
+  cp licenses/sherpa-onnx/LICENSE "$dest/"
+  if [[ -f "Vendor/models/$MODEL/README.md" ]]; then cp "Vendor/models/$MODEL/README.md" "$dest/"; fi
 else
-  echo "warning: Vendor/models/$MODEL missing; the bundle cannot listen until Scripts/fetch-vendor.sh runs." >&2
+  echo "warning: speech model incomplete; this fixture bundle cannot listen." >&2
 fi
 
 cp LICENSE THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
 cp -R licenses "$APP/Contents/Resources/"
-cp licenses/sherpa-onnx/LICENSE "$APP/Contents/Resources/models/$MODEL/LICENSE"
 
 # App icon from the bundled designer master and hinted small reps (no external rasterizer needed).
 ICON_WORK="$(mktemp -d)"
@@ -109,10 +113,8 @@ done
 codesign --force --options runtime "$TIMESTAMP" --sign "$CERT" --entitlements Resources/HeyDot.entitlements "$APP"
 codesign --verify --strict --deep "$APP"
 if [[ -n "$NOTARY" ]]; then
-  UPLOAD="$(mktemp -d)"
-  trap 'rm -rf "$UPLOAD"' EXIT
-  ditto -c -k --keepParent "$APP" "$UPLOAD/HeyDot.zip"
-  xcrun notarytool submit "$UPLOAD/HeyDot.zip" --keychain-profile "$NOTARY" --wait
+  ditto -c -k --keepParent "$APP" "$ICON_WORK/HeyDot.zip"
+  xcrun notarytool submit "$ICON_WORK/HeyDot.zip" --keychain-profile "$NOTARY" --wait
   xcrun stapler staple "$APP"
   spctl --assess --type execute -vv "$APP"
 fi

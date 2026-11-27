@@ -105,6 +105,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         control?.stop(); model?.stop()
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        model?.refreshMicrophoneAccess()
+    }
+
     /// The new process holds the same lease. Finish the erase before starting any profile writers.
     private func finishPendingErase() async -> Bool {
         let pending = PendingErase(paths: paths)
@@ -133,13 +137,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private var lastGlyph: (DotDesign, GlyphState, MenuBarIcon, Bool)?
     func updateGlyph() {
         // A fresh success shows a check for a few seconds instead of a notification that has to be closed.
+        statusItem.button?.toolTip = "HeyDot: \(model.statusLine)"
         let state = model.flashing && model.status.glyph == .listening ? GlyphState.ok : model.status.glyph
         let style = model.settings.menuBarIcon
         let dark = statusItem.button?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         if let last = lastGlyph, last.0 == model.settings.design, last.1 == state, last.2 == style, last.3 == dark { return }
         lastGlyph = (model.settings.design, state, style, dark)
         statusItem.button?.image = DotGlyph.image(model.settings.design, state: state, color: style == .color, darkBar: dark)
-        statusItem.button?.toolTip = "HeyDot: \(model.statusLine)"
     }
 
     /// An accessory app shows no menu bar, but its main menu's key equivalents still work whenever one of its
@@ -165,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     @objc func togglePopover() {
         guard let button = statusItem.button else { return }
         if popover.isShown { popover.performClose(nil); return }
+        model.refreshMicrophoneAccess()
         // The usage readout samples only while the popover is open (also driven by the view's onAppear).
         popoverActivity.visible = true
         ListenerUsage.shared.show("popover")

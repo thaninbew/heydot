@@ -134,11 +134,19 @@ public struct DotDesign: Codable, Equatable, Hashable, Sendable {
     }
 
     /// The HeyDot logo: the dot as a microphone head in its cradle ("8. Open cradle", picked from the round-3 board).
-    public static let `default` = DotDesign(fill: .colorBody, signature: .mic)
-    /// The previous default (sound arcs). Saved designs equal to it load as the new default.
-    static let previousDefault = DotDesign(fill: .inkBody, signature: .hey)
+    /// Coral is the palette colour nearest the logo's own coral, so a dot made from the logo stays coral.
+    public static let `default` = DotDesign(color: .coral, fill: .colorBody, signature: .mic)
+    /// Earlier logos: the sound arcs, the ink mic and 0.2.0's violet mic. Saved designs that look like one load as the logo.
+    static let previousLogos = [DotDesign(fill: .inkBody, signature: .hey), DotDesign(fill: .inkBody, signature: .mic),
+                                DotDesign(color: .violet, fill: .colorBody, signature: .mic)]
 
-    public var isDefaultLogo: Bool { signature == .mic || signature == .hey || signature == .heyWave || signature == .heyBubble }
+    /// Draws as the HeyDot logo (the designer's PNG on tiles, its coral everywhere else), whatever the nickname.
+    public var isLogo: Bool { custom == nil && withNickname("") == .default }
+
+    /// The HeyDot logo with this design's nickname.
+    public var logo: DotDesign { DotDesign.default.withNickname(nickname) }
+
+    func withNickname(_ name: String) -> DotDesign { var d = self; d.nickname = name; return d }
 }
 
 public extension Color {

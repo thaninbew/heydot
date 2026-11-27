@@ -29,6 +29,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var callsStarted: Int = 0
     /// The popover's "star on GitHub" card was answered (either button); it never shows again.
     public var starAsked: Bool = false
+    /// The settings file format. 1: the logo is coral (`DotDesign.default`), so a violet mic is the user's own choice.
+    /// Files without it were written before that and saved the logo as an earlier design.
+    public private(set) var version: Int = AppSettings.currentVersion
+    static let currentVersion = 1
 
     public init() {}
 
@@ -70,8 +74,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         morningMinutes = min(max(try c.decodeIfPresent(Int.self, forKey: .morningMinutes) ?? base.morningMinutes, 0), 24 * 60 - 1)
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? base.launchAtLogin
         design = try c.decodeIfPresent(DotDesign.self, forKey: .design) ?? base.design
-        // Earlier default logos follow the owner-selected open-cradle violet mic.
-        if design == .previousDefault || design == DotDesign(fill: .inkBody, signature: .mic) { design = .default }
+        // Before version 1 the logo was saved as one of the earlier logos; they follow the owner-selected open-cradle mic.
+        let saved = try c.decodeIfPresent(Int.self, forKey: .version) ?? 0
+        if saved < 1, DotDesign.previousLogos.contains(design.withNickname("")) { design = design.logo }
         onboarded = try c.decodeIfPresent(Bool.self, forKey: .onboarded) ?? base.onboarded
         menuBarIcon = try c.decodeIfPresent(MenuBarIcon.self, forKey: .menuBarIcon) ?? base.menuBarIcon
         inputDeviceUID = try c.decodeIfPresent(String.self, forKey: .inputDeviceUID)

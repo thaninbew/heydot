@@ -18,9 +18,14 @@ public struct SystemHooks {
             setLaunchAtLogin: { on in
                 guard paths.usesSystemData else { return }
                 if on {
-                    guard SMAppService.mainApp.status != .enabled,
-                          SMAppService.mainApp.status != .requiresApproval else { return }
-                    try SMAppService.mainApp.register()
+                    if SMAppService.mainApp.status != .enabled && SMAppService.mainApp.status != .requiresApproval {
+                        try SMAppService.mainApp.register()
+                    }
+                    if SMAppService.mainApp.status == .requiresApproval {
+                        throw NSError(domain: "HeyDot.LoginItem", code: 1, userInfo: [
+                            NSLocalizedDescriptionKey: "Allow HeyDot in System Settings > General > Login Items, or turn off Open at login."
+                        ])
+                    }
                 } else if SMAppService.mainApp.status != .notRegistered {
                     try SMAppService.mainApp.unregister()
                 }
@@ -33,7 +38,7 @@ public struct SystemHooks {
 }
 
 public enum AppStatus: Equatable {
-    case setupNeeded, micDenied, paused, signInNeeded, listening, calling, failed(String)
+    case setupNeeded, micAccessNeeded, micDenied, paused, signInNeeded, listening, calling, failed(String)
 
     public var glyph: GlyphState {
         switch self {
@@ -47,6 +52,8 @@ public enum AppStatus: Equatable {
 @MainActor
 public final class AppModel: ObservableObject {
     @Published public private(set) var settings: AppSettings
+    @Published private var microphoneAccess: AVAuthorizationStatus
+    @Published private var microphoneRequest: Task<Void, Never>?
     @Published public private(set) var engineError: String?
     /// The latest call or check result. A success shows briefly and clears itself (`successLifetime`); a problem
     /// stays until a later result replaces it or the user dismisses it. There is only ever one, so repeated
@@ -80,6 +87,7 @@ public final class AppModel: ObservableObject {
         self.settings = settings; self.engine = engine; self.enroller = enroller
         self.web = web ?? NoWeb()
         self.hooks = hooks; self.store = store; self.log = log
+        microphoneAccess = hooks.microphoneStatus()
         self.web.onCallChange = { [weak self] problem in
             guard let self else { return }
             if let problem { self.show(CallResult(outcome: "call-ended", message: problem)) }
@@ -93,14 +101,9 @@ public final class AppModel: ObservableObject {
         applySettingsChange(change)
     }
 
-    /// Finishing setup requires a saved file. A standalone voice tuning session only commits its tuning changes.
-    func saveOnboarding(launchAtLogin: Bool?) -> Bool {
-        applySettingsChange(requireSavedSettings: true) { settings in
-            if let launchAtLogin {
-                settings.launchAtLogin = launchAtLogin
-                settings.onboarded = true
-            }
-        }
+    /// Setup can advance only after its current settings are on disk.
+    func saveSetup(_ change: (inout AppSettings) -> Void = { _ in }) -> Bool {
+        applySettingsChange(requireSavedSettings: true, change)
     }
 
     @discardableResult
@@ -110,7 +113,7 @@ public final class AppModel: ObservableObject {
         change(&next)
         next.wake.phrase = next.phrase
         if !next.paused { next.pausedUntil = nil }
-        guard next != settings || (requireSavedSettings && settingsError != nil) else { return true }
+        guard next != settings || requireSavedSettings else { return true }
         let restart = next.wake != settings.wake || next.paused != settings.paused || next.onboarded != settings.onboarded
         let rewarm = next.dotURL != settings.dotURL
         let repause = next.paused != settings.paused || next.pausedUntil != settings.pausedUntil
@@ -132,7 +135,8 @@ public final class AppModel: ObservableObject {
 
     public var status: AppStatus {
         if !settings.onboarded || settings.dotURL == nil { return .setupNeeded }
-        if hooks.microphoneStatus() == .denied || hooks.microphoneStatus() == .restricted { return .micDenied }
+        if microphoneAccess == .notDetermined { return .micAccessNeeded }
+        if microphoneAccess != .authorized { return .micDenied }
         if settings.paused { return .paused }
         if calling || web.inCall { return .calling }
         if let engineError { return .failed(engineError) }
@@ -144,6 +148,7 @@ public final class AppModel: ObservableObject {
     public var statusLine: String {
         switch status {
         case .setupNeeded: "Set up needed"
+        case .micAccessNeeded: "Microphone access needed"
         case .micDenied: "Microphone access is off"
         case .paused: settings.pausedUntil.map { "Paused until \(Self.time($0))" } ?? "Paused"
         case .signInNeeded: "Sign in to ChatGPT"
@@ -173,12 +178,47 @@ public final class AppModel: ObservableObject {
     }
 
     public func refreshListening() {
-        guard !stopped else { return }
-        let shouldListen = settings.onboarded && !settings.paused && settings.dotURL != nil
-        if shouldListen || wakeOverride != nil { startEngine() } else if engine.isListening { engine.stop() }
+        refreshListening(access: hooks.microphoneStatus())
     }
 
-    func startEngine() {
+    /// Settings can change outside the app. Restart only when macOS reports a different permission.
+    func refreshMicrophoneAccess() {
+        let access = hooks.microphoneStatus()
+        if access != microphoneAccess { refreshListening(access: access) }
+    }
+
+    var requestingMicrophoneAccess: Bool { microphoneRequest != nil }
+
+    func requestMicrophoneAccess() async {
+        guard !stopped else { return }
+        if let microphoneRequest { await microphoneRequest.value; return }
+        guard hooks.microphoneStatus() == .notDetermined else { refreshMicrophoneAccess(); return }
+        let request = Task { [weak self, ask = hooks.requestMicrophone] in
+            defer { self?.microphoneRequest = nil }
+            guard self?.stopped == false else { return }
+            await withCheckedContinuation { (reply: CheckedContinuation<Void, Never>) in
+                ask { _ in reply.resume() }
+            }
+            self?.refreshMicrophoneAccess()
+        }
+        microphoneRequest = request
+        await request.value
+    }
+
+    func openMicrophoneSettings() {
+        hooks.openURL(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
+    }
+
+    private func refreshListening(access: AVAuthorizationStatus) {
+        guard !stopped else { return }
+        if microphoneAccess != access { microphoneAccess = access }
+        let shouldListen = settings.onboarded && !settings.paused && settings.dotURL != nil
+        // The engine's synchronous start can wait for the OS prompt, so ask separately after a user action.
+        if access == .authorized && (shouldListen || wakeOverride != nil) { startEngine() }
+        else if engine.isListening { engine.stop() }
+    }
+
+    private func startEngine() {
         engine.inputDeviceUID = settings.inputDeviceUID
         do {
             try engine.start(settings.wake) { [weak self] event in self?.handleWake(event) }

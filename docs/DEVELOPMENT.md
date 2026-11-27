@@ -121,11 +121,9 @@ capsule on 14 and 15. Every step that can wait has **Later** plus where to find 
 call route can't wait. Each button row is back, Later where it applies, and the primary; the tinted primary is the
 recommended way, with no badge.
 
-**Accent:** follows the dot's colour (`Accent` in `Frost.swift`): same hue and saturation, lightness moved into the
-band where white button text reads at 4.5:1 and the colour stands out on dark and light windows at 3:1; text and
-marks in dark mode use a lifted variant that reads at 4.5:1. The default logo, custom avatars and an undesigned dot
-use Frost's violet. It tints the buttons, focus rings, progress, tuning rings, the popover's level bars and
-listening dot, and updates when the dot is redesigned. The menu bar icon is unchanged. Motion is Core Animation on plain layers (the tile is rendered once into a layer), so it costs the app no
+The default logo uses coral. Redesigning a dot updates the buttons, focus rings, progress indicators
+and popover meter to follow its colours. Imported avatars use the Frost theme.
+Motion is Core Animation on plain layers (the tile is rendered once into a layer), so it costs the app no
 CPU, stops when the window closes, and is off with Reduce Motion. Closing a window releases its content. The
 popover draws the same tint statically. `Kit/UI/Frost.swift` holds the pieces.
 
@@ -145,9 +143,9 @@ Feedback never piles up: there is one result at a time. "Call started" and "Read
 with a check badge on the menu bar icon, then clear themselves. Problems stay, with a dismiss button, until
 a later result replaces them. HeyDot posts no system notifications.
 
-The default logo is **Mic** ("4. Mic" from the round-two board, `Dot/LogoV2.swift`): the dot as a
-microphone head in its cradle. It draws the default dot, the app icon and the menu bar glyph. Saved
-designs equal to the old default (sound arcs) load as Mic; sound arcs is no longer offered.
+**HeyDot** is the coral open-cradle microphone. It is the first choice under Shape and the design
+restored by **Reset to HeyDot**. Both keep the nickname. The welcome graphic and stock avatar tiles
+use the bundled designer artwork.
 
 ## Build and test
 
@@ -157,10 +155,10 @@ swift build
 swift test --no-parallel
 ./build-app.sh debug --preview   # HeyDotPreview.app: unsigned, fixtures and screenshots only
 HEYDOT_APPROVED_CERT_SHA1=<40 hex> ./build-app.sh release   # signed, hardened runtime, audio-input entitlement
-HEYDOT_APPROVED_CERT_SHA1=<40 hex> HEYDOT_NOTARY_PROFILE=<profile> ./build-app.sh release   # also notarized and stapled
+HEYDOT_VERSION=<version> HEYDOT_BUILD=<build> HEYDOT_APPROVED_CERT_SHA1=<40 hex> HEYDOT_NOTARY_PROFILE=<profile> ./build-app.sh release   # also notarized and stapled
 ```
 
-`HEYDOT_VERSION` and `HEYDOT_BUILD` set `CFBundleShortVersionString` and `CFBundleVersion` (default 0.1.0 and 1).
+`HEYDOT_VERSION` and `HEYDOT_BUILD` set `CFBundleShortVersionString` and `CFBundleVersion` (default 0.1.0 and 1 for local development). Set both explicitly for a notarized build.
 The bundle embeds Sparkle.framework without its XPC services and re-signs Sparkle's Autoupdate, Updater.app and the
 framework with the same certificate as the app.
 

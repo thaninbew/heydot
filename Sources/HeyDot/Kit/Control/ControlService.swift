@@ -15,6 +15,7 @@ extension AppModel {
             : (engine.isListening && settings.onboarded && settings.dotURL != nil ? "on" : .null)
         let state: String = switch status {
         case .setupNeeded: "setup_needed"
+        case .micAccessNeeded: "mic_permission_needed"
         case .micDenied: "mic_denied"
         case .paused: "paused"
         case .signInNeeded: "sign_in_needed"

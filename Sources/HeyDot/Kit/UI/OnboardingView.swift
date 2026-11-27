@@ -112,7 +112,7 @@ struct OnboardingView: View {
     /// One plain line: a problem in orange, otherwise a quiet note.
     @ViewBuilder func note(_ text: String?, problem: Bool = false) -> some View {
         if let text {
-            Text(text).font(.callout).foregroundStyle(problem ? Color.orange : .secondary)
+            Text(text).font(.callout).foregroundStyle(problem ? Color.primary : .secondary)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true).frame(maxWidth: 520)
         }
     }
@@ -140,6 +140,7 @@ struct OnboardingView: View {
             .font(.system(size: 14, weight: .medium))
         default:
             Button("Enable microphone", action: flow.requestMicrophone).frostButton(.chip)
+                .disabled(app.requestingMicrophoneAccess)
         }
     }
 
@@ -320,6 +321,7 @@ struct OnboardingView: View {
                     primaryButton("Open Privacy Settings", action: flow.openPrivacySettings)
                 } else {
                     primaryButton("Enable microphone", action: flow.requestMicrophone)
+                        .disabled(app.requestingMicrophoneAccess)
                 }
             }
         } else if flow.calibration == nil && (!flow.tuningStarted || flow.problem == .noAudio) {

@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import WakeEngine
 @testable import HeyDotKit
@@ -185,6 +187,34 @@ private func tempHome() throws -> URL {
     #expect(try store.load() == app.settings)
 }
 
+@MainActor @Test func rejectedLoginItemKeepsSetupOpenAndCanBeSkipped() throws {
+    let home = try tempHome()
+    defer { try? FileManager.default.removeItem(at: home) }
+    let store = SettingsStore(url: Paths(home: home).settings)
+    var hooks = QARender.fakeHooks()
+    hooks.launchAtLoginEnabled = { false }
+    hooks.setLaunchAtLogin = { requested in
+        if requested { throw POSIXError(.EPERM) }
+    }
+    let app = AppModel(settings: AppSettings(), engine: FakeEngine(), enroller: FakeEnroller(),
+                       hooks: hooks, store: store, log: Log(url: home.appendingPathComponent("test.log")))
+    let flow = OnboardingModel(app: app, tuner: FakeTuner())
+    flow.step = .done
+    var finished = false
+    flow.finish = { finished = true }
+
+    flow.primary()
+    #expect(!finished && flow.loginError != nil)
+    #expect(!app.settings.onboarded)
+    #expect(try !store.load().onboarded)
+
+    flow.launchAtLogin = false
+    flow.primary()
+    #expect(finished && flow.loginError == nil)
+    let saved = try store.load()
+    #expect(saved.onboarded && !saved.launchAtLogin)
+}
+
 @MainActor @Test func standaloneVoiceTuningDoesNotCompleteSetup() {
     let app = QARender.model { $0.onboarded = false; $0.dotURL = nil }
     let flow = OnboardingModel(app: app, tuner: FakeTuner())
@@ -239,4 +269,71 @@ private func tempHome() throws -> URL {
     let d = DotDesign(shape: .heart, color: .coral, eyes: .sleepyLids, glasses: .monocle, accessory: .crown, accessoryColor: .brown,
                       nickname: "Pip", fill: .colorBody)
     #expect(try JSONDecoder().decode(DotDesign.self, from: JSONEncoder().encode(d)) == d)
+}
+
+// MARK: HeyDot logo
+
+@MainActor private func pixels(_ view: some View, side: CGFloat = 64) -> Data? {
+    let renderer = ImageRenderer(content: view.frame(width: side, height: side))
+    renderer.scale = 1
+    return renderer.cgImage?.dataProvider?.data as Data?
+}
+
+private func hue(_ color: Color) -> Double {
+    let c = NSColor(color).usingColorSpace(.sRGB)!
+    let hex = UInt32(c.redComponent * 255) << 16 | UInt32(c.greenComponent * 255) << 8 | UInt32(c.blueComponent * 255)
+    return OKLCH(hex: hex).h
+}
+
+@MainActor @Test func theLogoStaysTheLogoWithANickname() {
+    var named = DotDesign.default
+    named.nickname = "Pip"
+    #expect(pixels(DotTile(named, size: 64)) == pixels(DotTile(.default, size: 64)), "a nickname swapped the logo for a drawn mic")
+    #expect(Theme.forDesign(named) == Theme.forDesign(.default))
+    #expect(Accent.hex(for: named) == Accent.hex(for: .default))
+}
+
+@MainActor @Test func theLogoAndDotsMadeFromItStayCoral() {
+    let brand = OKLCH(hex: Accent.defaultHex).h
+    var edits: [DotDesign] = [.default]
+    for edit in [{ (d: inout DotDesign) in d.eyes = .dots }, { $0.glasses = .monocle }, { $0.accessory = .crown }, { $0.fill = .inkBody }] {
+        var d = DotDesign.default; edit(&d); edits.append(d)
+    }
+    for design in edits {
+        let paint = DotView.palette(design, .standard)
+        let body = design.fill == .colorBody ? paint(.body)! : paint(.eye)!
+        #expect(OKLCH.hueDistance(hue(body), brand) < 30, "\(design) is drawn purple, not in the logo's coral")
+    }
+}
+
+@Test func theShapeRowOffersTheLogoBack() {
+    let tray = DotDesign(shape: .roundedTriangle, color: .lime, accessory: .headphones, nickname: "Tray")
+    #expect(ShapeChoice.all.first == .heyDot)
+    #expect(ShapeChoice(.default) == .heyDot && ShapeChoice(tray) == .shape(.roundedTriangle))
+    let back = ShapeChoice.heyDot.applied(to: tray)
+    #expect(back.isLogo && back.nickname == "Tray")
+    var avatar = tray
+    avatar.custom = CustomArt(id: "x", silhouette: true)
+    #expect(ShapeChoice(avatar) == nil && ShapeChoice.heyDot.applied(to: avatar).isLogo)
+}
+
+@Test func savedLogosLoadAsTheLogoKeepingTheirNickname() throws {
+    // HeyDot 0.2.0 saved the logo with the violet of the earlier flat mic, in a file without a version.
+    let saved = DotDesign(color: .violet, nickname: "Pip", fill: .colorBody, signature: .mic)
+    let json = try JSONSerialization.data(withJSONObject: ["design": JSONSerialization.jsonObject(with: JSONEncoder().encode(saved))])
+    let loaded = try JSONDecoder().decode(AppSettings.self, from: json).design
+    #expect(loaded.nickname == "Pip")
+    #expect(Theme.forDesign(loaded) == Theme.forDesign(.default) && Accent.hex(for: loaded) == Accent.hex(for: .default))
+}
+
+@Test func aVioletMicChosenNowStaysVioletAfterRelaunch() throws {
+    let home = try tempHome()
+    defer { try? FileManager.default.removeItem(at: home) }
+    let store = SettingsStore(url: Paths(home: home).settings)
+    var settings = AppSettings()
+    settings.design = DotDesign.default.withNickname("Pip")
+    settings.design.color = .violet  // the Violet swatch, picked on the logo
+    try store.save(settings)
+    let loaded = try store.load()
+    #expect(loaded.design == settings.design && !loaded.design.isLogo)
 }

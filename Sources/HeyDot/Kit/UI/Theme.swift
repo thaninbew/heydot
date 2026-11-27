@@ -41,7 +41,7 @@ struct Theme: Equatable, Sendable {
     /// when the dot wears one in a colour (charcoal and brown are ink, not hue). Empty for imported avatars.
     static func palette(for design: DotDesign) -> [UInt32] {
         guard design.custom == nil else { return [] }
-        if design == .default { return [Accent.defaultHex] }  // the logo's coral, not the mic's stored colour
+        if design.isLogo { return [Accent.defaultHex] }  // the logo's coral, not the mic's stored colour
         var colors = [design.color.hex]
         if design.accessory != .none, ![.charcoal, .brown].contains(design.accessoryColor), design.accessoryColor != design.color {
             colors.append(design.accessoryColor.hex)

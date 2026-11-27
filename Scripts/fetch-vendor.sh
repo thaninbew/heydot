@@ -18,17 +18,14 @@ if [[ ! -f Vendor/$release/lib/libsherpa-onnx-c-api.a ]]; then
   fetch "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/$release.tar.bz2" \
     3d7f9b8a496694af13d9802c33b8133231e397bdef302f543d19468765e83136 Vendor
 fi
-model=sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01
-if [[ ! -f Vendor/models/$model/bpe.model ]]; then
-  fetch "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/$model.tar.bz2" \
-    f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a Vendor/models
+source Scripts/model-files.sh
+if ! has_model_files "Vendor/models/$MODEL"; then
+  fetch "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/$MODEL.tar.bz2" \
+    f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a "$work/models"
+  has_model_files "$work/models/$MODEL"
+  mkdir -p "Vendor/models/$MODEL"
+  cp -R "$work/models/$MODEL/." "Vendor/models/$MODEL/"
 fi
-for file in tokens.txt bpe.model encoder decoder joiner; do
-  if [[ $file == encoder || $file == decoder || $file == joiner ]]; then
-    file=$file-epoch-12-avg-2-chunk-16-left-64.int8.onnx
-  fi
-  test -s "Vendor/models/$model/$file"
-done
 
 # The static archive contains libraries only; pin the matching official C ABI header too.
 mkdir -p Vendor/include
