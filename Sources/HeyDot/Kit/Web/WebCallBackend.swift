@@ -419,10 +419,14 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     public func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {
         guard !erasing else { return }
         signInClosed = onClose
+        let enteringPicker = pickingDot && !signInState.pickingDot
         signInState.pickingDot = pickingDot
         let title = pickingDot ? "Pick your dot" : "Sign in to ChatGPT"
         if let signInWindow {
             signInWindow.title = title
+            if enteringPicker, DotTab.conversation(at: signInView?.url, title: nil) == nil {
+                signInView?.load(URLRequest(url: Self.dotDirectory))
+            }
             NSApp.activate(ignoringOtherApps: true)
             signInWindow.makeKeyAndOrderFront(nil)
             return
@@ -453,7 +457,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     public func windowWillClose(_ notification: Notification) {
         guard (notification.object as? NSWindow) === signInWindow else { return }
-        let selected = DotTab.conversation(at: signInView?.url, title: signInView?.title)
+        let picker = signInState.pickingDot ? signInView : nil
         signInView?.stopLoading()
         signInWindow = nil; signInView = nil
         popups.forEach { $0.close() }; popups = []
@@ -465,7 +469,18 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         if let url = webView?.url, !inCall { load(url) }
         let closed = signInClosed
         signInClosed = nil
-        closed?(selected)
+        guard let picker, let selected = DotTab.conversation(at: picker.url, title: picker.title) else {
+            closed?(nil)
+            return
+        }
+        Task {
+            let state = await run(PageScripts.state, in: picker)
+            guard !erasing, signInWindow == nil else { return }
+            let path = state["path"] as? String
+            let confirmed = state["ready"] as? Bool == true && state["signedIn"] as? Bool == true
+                && path.map(Self.trim) == URL(string: selected.url)?.path
+            closed?(confirmed ? selected : nil)
+        }
     }
 
     public func signOut() async {

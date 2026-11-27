@@ -325,9 +325,18 @@ private func tempDir() throws -> URL {
     let single = OnboardingModel(app: model)
     await single.readWeb()
     #expect(single.urlDraft == first.url)
+    web.state = WebPageState(signedIn: true, dots: [first, second])
+    await single.readWeb()
+    #expect(single.urlDraft.isEmpty)
     single.pick(second)
     await single.readWeb()
     #expect(single.urlDraft == second.url)
+    web.state = WebPageState(signedIn: false)
+    await single.readWeb()
+    #expect(single.webDots.isEmpty && single.urlDraft.isEmpty)
+    single.urlDraft = first.url
+    await single.readWeb()
+    #expect(single.urlDraft == first.url)
 }
 
 @Test func browserSelectionRequiresASpecificChatGPTDot() {
