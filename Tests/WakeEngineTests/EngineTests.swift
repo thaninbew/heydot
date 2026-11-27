@@ -121,6 +121,18 @@ private func fixture(_ name: String) throws -> Clip {
         }
     }
 
+    /// Standard settings still spot the spelled phrase beside its sound-alike: the shorter "jery" (`▁JE RY`) is not how
+    /// the model hears "Jerry" (`▁JE R RY`), and a doubled vowel is not a sound-alike ("hey doot" is not "hey dot").
+    @Test func soundAlikesNeverReplaceTheSpelledPhrase() throws {
+        let jerry = try Spotter(settings: WakeSettings(phrase: "hey jerry"), directory: ModelFiles.locate())
+        for name in ["hey-jerry-Daniel", "hey-jerry-Samantha"] { #expect(try jerry.detect(fixture(name)) == 1, "\(name)") }
+        for name in ["hey-there", "hey-jarvis", "hey-john-Daniel", "hey-jeff-Daniel", "hey-dot-Karen"] {
+            #expect(try jerry.detect(fixture(name)) == 0, "\(name)")
+        }
+        let doot = try Spotter(settings: WakeSettings(phrase: "hey doot"), directory: ModelFiles.locate())
+        for voice in ["Samantha", "Daniel", "Karen"] { #expect(try doot.detect(fixture("hey-dot-" + voice)) == 0, "hey-dot-\(voice)") }
+    }
+
     /// Takes are compared with each other by sound, never with the spelling, and word breaks don't matter.
     @Test func takesAgreeByHowTheySound() {
         func heard(_ text: String) -> [String] { text.split(separator: " ").map { "▁" + $0 } }

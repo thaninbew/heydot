@@ -33,9 +33,9 @@ enum UninstallData {
         var errorDescription: String? { Paths.accessError }
     }
 
-    /// Call only while holding the app lease and before starting any profile writers.
-    @MainActor static func erase(paths: Paths, hooks: Hooks = Hooks(), dryRun: Bool = false, keepLogs: Bool = false,
-                                 out: (String) -> Void = { _ in }) async throws {
+    /// Everything `erase` would remove, after checking each path's parents and type, so a profile that can't be
+    /// erased is refused before anything is removed.
+    static func removableItems(paths: Paths, hooks: Hooks = Hooks(), keepLogs: Bool = false) throws -> [URL] {
         let bundleID = hooks.bundleID ?? paths.bundleID
         guard paths.allowsProfileAccess, paths.webStoreID == nil || bundleID == paths.bundleID else {
             throw ProfileAccessError()
@@ -83,6 +83,15 @@ enum UninstallData {
                 return true
             }) { existing.append(url) }
         }
+        return existing
+    }
+
+    /// Call only while holding the app lease and before starting any profile writers.
+    @MainActor static func erase(paths: Paths, hooks: Hooks = Hooks(), dryRun: Bool = false, keepLogs: Bool = false,
+                                 out: (String) -> Void = { _ in }) async throws {
+        let bundleID = hooks.bundleID ?? paths.bundleID
+        let existing = try removableItems(paths: paths, hooks: hooks, keepLogs: keepLogs)
+        let fm = FileManager.default
 
         let verb = dryRun ? "Would remove" : "Removed"
         var removed = 0
@@ -121,6 +130,22 @@ enum UninstallData {
             }
         }
         if removed == 0 { out("Nothing to remove: HeyDot has no data on this Mac.") }
+    }
+
+    /// Erase and Start Over checks this before marking the erase pending: a profile the relaunched app can't
+    /// erase would otherwise block every launch.
+    static func validateErase(paths: Paths) throws {
+        do {
+            _ = try removableItems(paths: paths)
+            try validateWebKitStore(paths: paths)
+        } catch {
+            throw EraseRefused(cause: error)
+        }
+    }
+
+    struct EraseRefused: LocalizedError {
+        let cause: Error
+        var errorDescription: String? { "HeyDot can't erase its data, so nothing was erased. \(cause.localizedDescription)" }
     }
 
     static func validateWebKitStore(paths: Paths) throws {

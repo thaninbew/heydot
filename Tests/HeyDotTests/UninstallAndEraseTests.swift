@@ -90,6 +90,28 @@ import Testing
     #expect(try await !pending.eraseIfPending())
 }
 
+/// Erase and Start Over is refused before it is marked pending when the relaunched app couldn't finish it (a
+/// symlinked Library folder), so later launches don't stop at "couldn't finish erasing".
+@MainActor @Test func eraseThatCouldNotFinishIsRefusedBeforeItIsPending() throws {
+    let home = try tempDir()
+    defer { try? FileManager.default.removeItem(at: home) }
+    let paths = Paths(home: home)
+    let pending = PendingErase(paths: paths)
+    let fm = FileManager.default
+    let external = home.appendingPathComponent("another-library", isDirectory: true)
+    try fm.createDirectory(at: external, withIntermediateDirectories: true)
+    try fm.createDirectory(at: paths.lifecycleDirectory, withIntermediateDirectories: true)
+    for name in ["Caches", "Logs", "Preferences", "HTTPStorages"] {
+        let parent = home.appendingPathComponent("Library/\(name)", isDirectory: true)
+        try fm.createSymbolicLink(at: parent, withDestinationURL: external)
+        #expect(throws: UninstallData.EraseRefused.self, "\(name)") { try pending.request() }
+        #expect(try !pending.isPending(), "\(name)")
+        try fm.removeItem(at: parent)
+    }
+    try pending.request()
+    #expect(try pending.isPending())
+}
+
 @MainActor @Test func erasePreservesTheRunningAppEvenThroughABundleSymlink() async throws {
     let home = try tempDir()
     defer { try? FileManager.default.removeItem(at: home) }

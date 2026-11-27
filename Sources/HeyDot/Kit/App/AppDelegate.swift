@@ -7,7 +7,7 @@ import WakeEngine
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
     private let paths: Paths
     private let finishingErase: Bool
-    private var model: AppModel!
+    var model: AppModel!
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private let popoverActivity = PopoverActivity(visible: false)
@@ -224,6 +224,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private func close(_ key: String) { windows[key]?.close() }
 
     func showOnboarding(startAt step: OnboardingStep = .welcome) {
+        // An open setup window gets the new flow; the old one leaves its step first, as closing the window would.
+        if let old = onboarding { old.leave(old.step) }
         let flow = OnboardingModel(app: model)
         flow.step = step
         flow.returnAfterTuning = step == .voice
@@ -269,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
 
     private func eraseAndRestart() throws {
         guard !updates.isUpdating else { throw RestartError.updateInProgress }
-        try UninstallData.validateWebKitStore(paths: paths)
+        try UninstallData.validateErase(paths: paths)
         guard let executable = Bundle.main.executableURL else { throw RestartError.executableMissing }
         let successor = Process()
         successor.executableURL = executable

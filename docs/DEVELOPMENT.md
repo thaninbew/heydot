@@ -279,7 +279,8 @@ default input is left alone). There is no "say something else" step: recorded co
 setting in the accuracy eval. **Continue** runs `Enroller.calibrate` once three takes agree: it stores, as
 `WakeSettings.learned`, the token sequences the model heard in those takes that are long enough to be specific, or
 that the user repeats and the listener would otherwise miss, and leans the threshold below the weakest take. Every
-keyword set, standard or tuned, spots the phrase as the model writes it (`Spotter.written`: "Trey" as `▁TRA Y`). See
+keyword set, standard or tuned, spots the typed phrase and the phrase as the model writes it (`Spotter.written`:
+"Trey" as `▁TRA Y`). See
 [tuning accuracy](tuning-accuracy.md).
 The listener spots the learned sequences beside the spelled phrase at no extra idle cost. The live listener is paused
 while tuning so a "Hey <Name>" can't start a real call. The privacy note and the listener readout are in

@@ -42,6 +42,11 @@ private enum AccuracyEval {
         "hey dot": ["hey don", "hey doc", "hey dad"],
         "hey nova": ["hey noah", "hey nora", "hey nolan"],
         "hey maximilian": ["hey max", "hey maxwell", "hey million"],
+        // Names whose sound-alikes are shorter spellings (HEYDOT_EVAL_PHRASES only).
+        "hey lee": ["hey lets go", "hey leslie", "hey lemon"],
+        "hey bee": ["hey ben", "hey becky", "hey beth"],
+        "hey doot": ["hey dot", "hey don", "hey dude"],
+        "hey jerry": ["hey jenny", "hey jeff", "hey gary"],
     ]
     static let sentences = ["i'm making a cup of coffee", "hey what time is it", "let's watch the game tonight"]
 
