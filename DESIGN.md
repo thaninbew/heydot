@@ -28,7 +28,9 @@ fallback over a sample wallpaper.
 | `.chip` | Inline actions in cards and Settings, pause chips, Resume | 30 | 11 | fits the text |
 
 A button row holds only back, Later where it applies, and the primary, centred with 12 pt between them. The tinted
-primary is the recommendation; there is no badge. Hints sit above the row. Destructive chips use red text.
+primary is the recommendation; there is no badge. Hints sit above the row. Every setup step uses `SetupStepLayout`:
+page dots fixed at the top, the content centred between, and the row pinned 32 pt from the bottom, so it never
+moves between steps or as a step's content changes. A footer row keeps one pill height whatever it shows. Destructive chips use red text.
 `FrostChoice` replaces segmented controls (a capsule track of chips, the chosen one filled with the accent).
 Forms apply `FrostButtonStyle(role: .chip)` once to the whole form.
 

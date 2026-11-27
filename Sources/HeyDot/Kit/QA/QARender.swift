@@ -52,6 +52,24 @@ enum QARender {
         return m
     }
 
+    /// A setup step with fake hardware, as if the guided path led there (QA renders and layout tests).
+    static func flow(_ step: OnboardingStep, mic: AVAuthorizationStatus = .authorized, signedIn: Bool? = true,
+                     settings change: (inout AppSettings) -> Void = { _ in }, tweak: (OnboardingModel) -> Void = { _ in }) -> OnboardingView {
+        let m = model({ s in
+            s.onboarded = false; s.dotName = "Dot"; s.wake = WakeSettings(); s.design = .default; s.dotURL = nil
+            s.calibrationNote = nil; change(&s)
+        }, mic: mic, signedIn: signedIn)
+        let f = OnboardingModel(app: m, tuner: FakeTuner())
+        f.step = step
+        // Back history as if the guided path led here.
+        f.trail = Array([OnboardingStep.welcome, .name, .voice, .connect].prefix { $0 != step })
+        f.micStatus = mic
+        f.devices = [AudioInput(id: 1, uid: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone", transport: .builtIn),
+                     AudioInput(id: 2, uid: "AA-BB:input", name: "AirPods Pro", transport: .bluetooth)]
+        tweak(f)
+        return OnboardingView(flow: f)
+    }
+
     /// Renders a SwiftUI view through a real (offscreen) AppKit window so native controls draw.
     static func snapshot<V: View>(_ view: V, to url: URL, dark: Bool = false, size fixed: CGSize? = nil,
                                   background: NSColor = .windowBackgroundColor) throws {
@@ -151,22 +169,6 @@ enum QARender {
             try doctor("troubleshoot-done", Dictionary(uniqueKeysWithValues: Troubleshooter.Step.allCases.map { ($0, .ok("Fine.")) }))
 
             // Onboarding: every step and the tuning screen's states.
-            func flow(_ step: OnboardingStep, mic: AVAuthorizationStatus = .authorized, signedIn: Bool? = true,
-                      settings change: (inout AppSettings) -> Void = { _ in }, tweak: (OnboardingModel) -> Void = { _ in }) -> OnboardingView {
-                let m = model({ s in
-                    s.onboarded = false; s.dotName = "Dot"; s.wake = WakeSettings(); s.design = .default; s.dotURL = nil
-                    s.calibrationNote = nil; change(&s)
-                }, mic: mic, signedIn: signedIn)
-                let f = OnboardingModel(app: m, tuner: FakeTuner())
-                f.step = step
-                // Back history as if the guided path led here.
-                f.trail = Array([OnboardingStep.welcome, .name, .voice, .connect].prefix { $0 != step })
-                f.micStatus = mic
-                f.devices = [AudioInput(id: 1, uid: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone", transport: .builtIn),
-                             AudioInput(id: 2, uid: "AA-BB:input", name: "AirPods Pro", transport: .bluetooth)]
-                tweak(f)
-                return OnboardingView(flow: f)
-            }
             let speech: [Float] = (0..<72).map { i in
                 let t = Float(i)
                 return i < 18 ? -58 : (i % 23 < 13 ? -28 + 14 * sin(t * 0.9) * sin(t * 0.21) : -55)

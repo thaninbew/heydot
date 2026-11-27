@@ -350,7 +350,7 @@ struct TroubleshootView: View {
 
     func fix(_ title: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title).fontWeight(primary ? .semibold : .regular).lineLimit(1).fixedSize().padding(.horizontal, 3)
+            Text(title).fontWeight(primary ? .semibold : .regular).lineLimit(1).fixedSize()
         }
         .frostButton(.chip)
     }
@@ -368,8 +368,10 @@ struct TroubleshootView: View {
             if doctor.done {
                 Button("Call \(model.displayName)") { close(); Task { await model.callNow() } }.frostButton(.primary)
             } else if !doctor.running {
-                Button(doctor.failed == nil ? "Start" : "Start over") { doctor.start() }.frostButton(.chip)
+                Button(doctor.failed == nil ? "Start" : "Start over") { doctor.start() }.frostButton(.secondary)
             }
         }
+        // One pill height whether it shows Call, Start or nothing, so the window doesn't resize as checks run.
+        .frame(height: Frost.pillHeight)
     }
 }
