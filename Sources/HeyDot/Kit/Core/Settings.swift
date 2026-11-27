@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import WakeEngine
 
@@ -91,16 +92,68 @@ public struct SettingsStore: Sendable {
 
     /// Missing file means first run (defaults). An unreadable file is reported, never silently replaced.
     public func load() throws -> AppSettings {
-        guard FileManager.default.fileExists(atPath: url.path) else { return AppSettings() }
-        return try JSONDecoder().decode(AppSettings.self, from: Data(contentsOf: url))
+        guard let data = try read(url) else { return AppSettings() }
+        return try JSONDecoder().decode(AppSettings.self, from: data)
     }
 
     public func save(_ settings: AppSettings) throws {
-        try Paths.ensureDirectory(url.deletingLastPathComponent(), mode: 0o700)
+        try write(encode(settings), to: url)
+    }
+
+    /// Recheck the file after confirmation. A valid file restored while the alert was open takes precedence.
+    func rebuildUnreadable() throws -> AppSettings {
+        let defaults = AppSettings()
+        if let data = try read(url) {
+            do {
+                return try JSONDecoder().decode(AppSettings.self, from: data)
+            } catch {
+                try backUp(data)
+            }
+        }
+        try save(defaults)
+        return defaults
+    }
+
+    private func backUp(_ data: Data) throws {
+        // A retry can reuse the original backup even after the app has quit.
+        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        let backup = url.appendingPathExtension("damaged-\(hash)")
+        if let previous = try read(backup) {
+            let type = try FileManager.default.attributesOfItem(atPath: backup.path)[.type] as? FileAttributeType
+            guard type == .typeRegular, previous == data else {
+                throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: backup.path])
+            }
+        } else {
+            try write(data, to: backup, replacing: false)
+        }
+    }
+
+    private func read(_ file: URL) throws -> Data? {
+        do {
+            return try Data(contentsOf: file)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            return nil
+        }
+    }
+
+    private func encode(_ settings: AppSettings) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(settings).write(to: url, options: [.atomic])
-        try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: Int16(0o600))], ofItemAtPath: url.path)
+        return try encoder.encode(settings)
+    }
+
+    private func write(_ data: Data, to destination: URL, replacing: Bool = true) throws {
+        let directory = destination.deletingLastPathComponent()
+        try Paths.ensureDirectory(directory, mode: 0o700)
+        let temporary = directory.appendingPathComponent(".settings-write-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try data.write(to: temporary, options: .withoutOverwriting)
+        try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: Int16(0o600))], ofItemAtPath: temporary.path)
+        // Commit only after the replacement is private. A failed write leaves the destination intact.
+        let result = replacing ? rename(temporary.path, destination.path) : link(temporary.path, destination.path)
+        guard result == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 
     /// `--reset-onboarding`: moves the settings file aside to `settings.json.reset-<UTC timestamp>` (kept, never

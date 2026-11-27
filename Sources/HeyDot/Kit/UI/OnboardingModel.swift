@@ -163,7 +163,7 @@ final class OnboardingModel: ObservableObject {
         case .voice where returnAfterTuning:
             complete(); return
         case .done:
-            applyLogin(); complete(); return
+            complete(); return
         default: break
         }
         go(to: following(step))
@@ -221,9 +221,11 @@ final class OnboardingModel: ObservableObject {
         }
     }
 
-    func complete() {
+    private func complete() {
+        let loginChoice = step == .done ? launchAtLogin : nil
+        guard app.saveOnboarding(launchAtLogin: loginChoice) else { return }
+        if loginChoice != nil { applyLogin() }
         leave(step)
-        app.update { $0.onboarded = true }
         finish()
     }
 
@@ -530,14 +532,13 @@ final class OnboardingModel: ObservableObject {
 
     // MARK: Done
 
-    func applyLogin() {
+    private func applyLogin() {
         do {
             try app.hooks.setLaunchAtLogin(launchAtLogin)
             loginError = nil
         } catch {
             loginError = "macOS didn't accept the login item: \(error.localizedDescription)"
         }
-        app.update { $0.launchAtLogin = launchAtLogin }
     }
 
     func startTest() {

@@ -286,6 +286,9 @@ struct OnboardingView: View {
                 laterHint("Later uses standard settings. Tune any time in Settings > Voice tuning.").padding(.top, 14)
             }
             voiceActions.padding(.top, 12)
+            if flow.returnAfterTuning, let error = app.settingsError {
+                note(error, problem: true).padding(.top, 10)
+            }
             Spacer(minLength: 0)
         }
     }
@@ -517,9 +520,15 @@ struct OnboardingView: View {
                 }
             }
             .frame(height: 232)
-            heading(flow.heard ? "Heard you. You\u{2019}re set." : "You\u{2019}re set.",
-                    flow.heard ? "Say \u{201C}\(flow.phraseTitle)\u{201D} anytime." : "Say \u{201C}\(flow.phraseTitle)\u{201D} anytime. Nothing to press.")
-                .padding(.top, 16)
+            Group {
+                if app.settingsError != nil {
+                    heading("Save your setup")
+                } else {
+                    heading(flow.heard ? "Heard you. You\u{2019}re set." : "You\u{2019}re set.",
+                            flow.heard ? "Say \u{201C}\(flow.phraseTitle)\u{201D} anytime." : "Say \u{201C}\(flow.phraseTitle)\u{201D} anytime. Nothing to press.")
+                }
+            }
+            .padding(.top, 16)
             actions(back: false) {
                 Button { Task { await flow.realTestCall() } } label: {
                     Label(flow.testCalling ? "Calling\u{2026}" : "Try a call", systemImage: "phone")
@@ -527,7 +536,7 @@ struct OnboardingView: View {
                 .frostButton(.secondary)
                 .disabled(flow.testCalling || app.settings.dotURL == nil)
                 .help("Presses your dot's call button once.")
-                primaryButton("Done", action: flow.primary)
+                primaryButton(app.settingsError == nil ? "Done" : "Try Again", action: flow.primary)
             }
             .padding(.top, 20)
             HStack(spacing: 18) {
@@ -541,7 +550,7 @@ struct OnboardingView: View {
             .padding(.top, 20)
             laterHint("Change any of this later in Settings.").padding(.top, 8)
             Group {
-                if let error = flow.loginError { note(error, problem: true) }
+                if let error = app.settingsError ?? flow.loginError { note(error, problem: true) }
                 else if let result = flow.testResult { ResultBanner(result: result).frame(width: 380) }
             }
             .padding(.top, 10)

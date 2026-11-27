@@ -8,6 +8,7 @@ import Sparkle
 final class Updates: NSObject, ObservableObject, SPUUpdaterDelegate {
     @Published private(set) var canCheck = false
     private var controller: SPUStandardUpdaterController?
+    private var automaticChecksObservation: AnyCancellable?
     private var willInstallOnQuit = false
 
     /// Only a built app carries a feed URL, so tests, previews and `swift run` never start an updater.
@@ -17,6 +18,17 @@ final class Updates: NSObject, ObservableObject, SPUUpdaterDelegate {
         let controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
         self.controller = controller
         controller.updater.publisher(for: \.canCheckForUpdates).receive(on: RunLoop.main).assign(to: &$canCheck)
+        automaticChecksObservation = controller.updater.publisher(for: \.automaticallyChecksForUpdates, options: .new)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+    }
+
+    var canConfigureAutomaticChecks: Bool { controller != nil }
+
+    var automaticChecksEnabled: Bool { controller?.updater.automaticallyChecksForUpdates ?? false }
+
+    func setAutomaticChecksEnabled(_ enabled: Bool) {
+        controller?.updater.automaticallyChecksForUpdates = enabled
     }
 
     func check() { controller?.checkForUpdates(nil) }

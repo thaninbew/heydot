@@ -26,25 +26,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task {
             guard await finishPendingErase() else { NSApp.terminate(nil); return }
-            startProfile()
+            installEditMenu()
+            let store = SettingsStore(url: paths.settings)
+            guard let settings = loadSettings(from: store) else { NSApp.terminate(nil); return }
+            startProfile(settings: settings, store: store)
         }
     }
 
-    private func startProfile() {
-        let store = SettingsStore(url: paths.settings)
-        var settings = AppSettings()
-        var loadError: String?
-        do { settings = try store.load() } catch {
-            loadError = "Settings file couldn't be read, so defaults are in use: \(error.localizedDescription)"
+    private func loadSettings(from store: SettingsStore) -> AppSettings? {
+        do { return try store.load() } catch {
             Log.shared.write("settings: \(error)")
         }
+
+        var rebuildError: String?
+        while true {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            if let rebuildError {
+                alert.messageText = "HeyDot couldn't rebuild its settings"
+                alert.informativeText = rebuildError
+                alert.addButton(withTitle: "Try Again")
+            } else {
+                alert.messageText = "HeyDot couldn't read its settings"
+                alert.informativeText = "Rebuilding keeps a copy of the original file in HeyDot's Application Support folder and opens setup with fresh settings. Your ChatGPT sign-in is kept."
+                alert.addButton(withTitle: "Rebuild Settings")
+            }
+            alert.addButton(withTitle: "Quit HeyDot").keyEquivalent = "\u{1b}"
+            NSApp.activate(ignoringOtherApps: true)
+            guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+            do {
+                return try store.rebuildUnreadable()
+            } catch {
+                rebuildError = error.localizedDescription
+                Log.shared.write("settings: rebuild failed: \(error)")
+            }
+        }
+    }
+
+    private func startProfile(settings: AppSettings, store: SettingsStore) {
         model = AppModel(settings: settings, engine: WakeEngine(log: { Log.shared.write($0) }), enroller: Enroller(),
-                         web: WebCallBackend(paths: paths), hooks: .live(paths: paths), store: loadError == nil ? store : nil)
-        model.settingsError = loadError
+                         web: WebCallBackend(paths: paths), hooks: .live(paths: paths), store: store)
         updates = Updates()
         Log.shared.write("app: started, version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
 
-        installEditMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePopover)
