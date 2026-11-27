@@ -1,84 +1,94 @@
-# Voice tuning accuracy, 2026-11-15
+# Voice tuning accuracy, 2026-11-27
 
-Branch `heydot-tuning`. Baseline `15a3cad`; after `e5d482e`. Synthetic speech only (macOS `say`), no microphone.
+Issue #21. Before: `1d2e5b2` (main before this change). Synthetic speech only (macOS `say`), no microphone.
 
+## What changed and why
 
-- The tuning screen ticked a slot when the lenient detector matched **or** for any 0.35 to 2.8 s utterance
-  (`OnboardingModel.heard`). "Hey John" is phrase length, so it ticked.
-- The detector could not have helped a rare name: its tokenizer spelling (for example `▁LU MI NA RO PO LI S`) can differ
-  from the token path the model actually hears. sherpa-onnx KWS only fires on an exact token path, so such a phrase
-  scored 0 even at threshold 0.01, and calibration then tried looser settings chasing positives it could never catch.
-- The detector never fired on "hey john" either (FA 0/48 before and after). The false success was the tick.
+- **Tuning listens to the user, not to our spelling.** Before, a take ticked only when `Hearing.judge` found the spelled
+  name in what the model heard, so a speaker the model hears as "Hey Daughter" for "Hey Dot", or "Page Ray" for
+  "Hey Trey", was told "a different name" or "without the start" and never got four ticks. Now a recording is a take
+  when it is plausible (the model made words of it, at most a few more words than the phrase, under 4 s), and a slot
+  ticks for each take that sounds like the user's other takes (`Takes.agreeing`: a sound-alike edit distance between
+  takes, word breaks removed, bar 0.65). A stray take ("Hey John", a cough) stays out of the group. Hints describe
+  the recording: "too quiet", "Didn't catch anything", "longer than a wake phrase", "sounded different from your
+  others". `Hearing` is deleted.
+- **No "say something else" step.** The eval tuned every speaker with and without the three recorded other phrases
+  ("Hey John", the name alone, "Hey there"): every threshold, learned sequence, TA and FA was identical, so the step
+  only made tuning feel like a test.
+- **What calibration learns.** The token sequences the model heard in the agreeing takes: every long (specific)
+  reading, and a short one only when the user repeats it and the listener would miss that take without it
+  (`Takes.specific`, `Takes.repeated`). A one-off short reading is how the model misheard one take; learning it
+  ("HEY DRAY" once among "HEY TRAY"s) answers "Hey Dre". The threshold rule is unchanged.
 
-## Approach
+## Why a rushed "hey Trey" needed a pause
 
-1. `PhraseDecoder`: the same keyword model run as a plain recognizer, only while tuning. No new model or dependency.
-2. `Hearing.judge`: a slot ticks only when the heard name matches the phrase by a sound-alike edit distance
-   (spelling-of-sound normalization, half cost for vowels and voiced/unvoiced pairs, stricter bar for short names).
-   Otherwise the hint says "a different name", "without the start" or "didn't catch that".
-3. Calibration stores the heard token sequences as extra keywords (`WakeSettings.learned`), for short names only when
-   the match is clear and starts with the same sound. The threshold sits 40% of the way from the strongest recorded
-   negative to the weakest sample, at least 0.03 above that negative and never above that sample. A recorded
-   negative is never answered.
-4. The tuning screen asks for "Hey John" (or "Hey Sam"), the name alone and "Hey there". The Start over pill clears
-   all samples. Tapping a tick retries that sample.
+The spotter (sherpa-onnx KWS) fires only on an exact token path. Standard settings listened for the tokenizer's
+spelling of the typed phrase, `▁HE Y ▁T RE Y`, but the model writes the sound "Trey" its own way: `▁TRA Y`, and when
+rushed `▁DR A Y` or `▁HA T RE Y`. Said carefully after a pause, the T is clear enough for the keyword boost to pull
+the beam onto the rare written path; rushed, it is not. Rushing changes the letters and moves the word break
+(`▁HA T RE Y`), and no listened-for path matched either. The live listener has no segmenter and feeds one continuous
+stream, so windowing is not involved; the tuning decoder heard `▁HE Y ▁TRA Y` for most voices with and without the
+pause, so the "HEY" piece is intact.
 
-Rejected: a DTW template verifier (not needed once the right tokens are spotted), openWakeWord (per-word training on
-TTS plus about 2,000 h of negatives, too heavy on device), Porcupine (closed engine, cloud training), and hotword
-biasing of the tuning decoder (measured no effect).
-Sources: sherpa-onnx v1.13.8 `transducer-keyword-decoder.cc` (trigger = mean raw token probability of the best
-path, L147-160), `context-graph.cc`, `utils.cc` keyword syntax; Hazen et al. ASRU 2009; Zhang and Glass ASRU 2009.
+Fix: every keyword set spots the phrase **as the model writes it** (`Spotter.written`): of the typed spelling and its
+sound-alikes ("trey", "tray", "trei"), the one the tokenizer's unigram model finds most likely. For "hey trey" that is
+`▁HE Y ▁TRA Y`; for "hey dot" or "hey tray" nothing changes. Regression: `rushedHeyTreyWakesOnStandardSettings`
+(Karen at 340 and Daniel at 300 words/minute) fails on `1d2e5b2` and passes now.
+
+Rejected, measured: listening for every sound-alike at once (more "hey troy" hits); learning rushed forms from the
+user's takes sped up with WSOLA, which reproduced what the model hears in real fast speech but tripled "hey dre"
+hits (rushed "Trey" and "Dray" are the same token path, and per-keyword confidences don't separate them).
 
 ## Accuracy
 
-`HEYDOT_EVAL=1 swift test --filter wakeAccuracyEval 2>&1 | grep 'EVAL|'` (cache `/tmp/heydot-eval-cache`).
+`HEYDOT_EVAL=1 swift test --filter wakeAccuracyEval 2>&1 | grep 'EVAL|'` (cache `/tmp/heydot-eval-cache`; narrow a run
+with `HEYDOT_EVAL_PHRASES` and `HEYDOT_EVAL_SCENARIOS`).
 - **Voices:** 8 (Samantha, Daniel, Karen, Moira, Rishi, Tessa, Eddy US, Reed UK).
-- **Test clips:** rates 140, 175 and 210, each clean and noisy (white noise at 25 dB SNR plus another voice's
-  sentence 12 dB under).
-- **Tuned:** per speaker, then aggregated. TA counts 48 positives and FA 528 confusables per phrase.
+- **Test clips:** rates 140, 175, 210, each clean and noisy (white noise at 25 dB SNR plus another voice's sentence
+  12 dB under): TA counts 48 positives, FA 528 confusables per phrase. **Fast:** rates 260 and 320, where `say` runs
+  "hey" into the name with no pause: 32 positives, 352 confusables. **Fast paused:** the same with 500 ms of silence
+  after "hey".
+- **Tuned:** the tuning screen simulated per speaker: attempts at 150, 165, 190, 200 then 155, 180, 195, 205 until four
+  takes count (before: until four ticked `Hearing.judge`), then calibration. The bug flow says "hey john" as attempt 2.
 
-The baseline harness (same corpus) differed in its tuned flow. It calibrated four fixed enrollment clips; the bug
-flow replaced the last with "hey john", which the old screen ticked. Negatives were "hey there", the name alone and
-"I'm making a cup of coffee". The tuned flow now simulates the current screen: attempts at enrollment rates 150,
-165, 190 and 200, then retries at 155, 180, 195 and 205, ticking only on `Hearing.judge`. The bug flow says
-"hey john" as attempt 2. Continue needs three ticks, else Later.
+Both columns come from the same harness, the before column with the old judge and calibration.
 
-| Phrase | Tuned TA before | Tuned TA after | Clean before / after | Noisy before / after | FA before / after | FA "hey john" |
+| Phrase | Settings | TA before / after | TA fast before / after | TA fast paused before / after | FA before / after | FA fast before / after |
 |---|---|---|---|---|---|---|
-| hey dot | 83.3% | 81.2% | 100 / 100% | 66.7 / 62.5% | 3.4 / 3.6% | 0 / 0 |
-| hey nova | 77.1% | 75.0% | 91.7 / 87.5% | 62.5 / 62.5% | 1.3 / 1.1% | 0 / 0 |
-| hey maximilian | 54.2% | **83.3%** | 70.8 / 95.8% | 37.5 / 70.8% | 0.0 / 0.0% | 0 / 0 |
-| rare five-syllable name | 0.0% | **45.8%** | 0.0 / 66.7% | 0.0 / 25.0% | 0.0 / 0.0% | 0 / 0 |
-| short one-syllable name | 60.4% | **85.4%** | 75.0 / 95.8% | 45.8 / 75.0% | 3.0 / 5.1% | 0 / 0 |
+| hey trey | Standard | 39.6 / **62.5%** | 28.1 / **40.6%** | 28.1 / 43.8% | 2.1 / **1.3%** | 0.0 / 0.6% |
+| hey trey | Tuned | 85.4 / **89.6%** | 59.4 / 59.4% | 62.5 / 62.5% | 5.1 / **4.2%** | 2.3 / 2.3% |
+| hey tray | Standard | 54.2 / 54.2% | 40.6 / 40.6% | 46.9 / 46.9% | 1.3 / 1.3% | 0.6 / 0.6% |
+| hey tray | Tuned | 75.0 / 75.0% | 59.4 / 59.4% | 71.9 / 78.1% | 5.1 / **4.2%** | 2.3 / 2.3% |
+| hey dot | Standard | 83.3 / 83.3% | 87.5 / 87.5% | 65.6 / 65.6% | 3.4 / 3.4% | 4.8 / 4.8% |
+| hey dot | Tuned | 81.2 / 83.3% | 87.5 / 84.4% | 68.8 / 65.6% | 3.6 / 3.2% | 4.5 / 4.0% |
+| hey nova | Tuned | 75.0 / **85.4%** | 81.2 / 81.2% | 56.2 / 56.2% | 1.1 / 1.5% | 1.1 / 1.1% |
+| hey maximilian | Tuned | 83.3 / 83.3% | 81.2 / 81.2% | 78.1 / 78.1% | 0.0 / 0.0% | 0.0 / 0.0% |
+| rare five-syllable name | Tuned | 70.8 / 68.8% | 34.4 / 34.4% | 21.9 / 18.8% | 0.0 / 0.0% | 0.0 / 0.0% |
 
-- **Bug flow:** identical to the honest flow after the fix. "hey john" ticked 0 of 40 times. Before, the duration rule
-  ticked any phrase-length "hey john".
-- **Short-name FA breakdown:** "hey dre" 0 to 12/48 and "hey troy" 16 to 13/48 (tuned), "hey" and "hey ray" 1/48 each.
-  `say` pronounces "Dre" as "Dray", one voicing step from "Tray"; excluding it, tuned FA is 15/480 (3.1%) against
-  16/480 (3.3%) before.
-- **Thresholds cannot separate these:** a 0.5 lean and a 0.08 floor each cost TA and removed no FA.
-- **Stuck below three ticks:** 5 of 40 speaker-phrase pairs (the rare name with Eddy and Reed, dot with Rishi and Eddy, nova with
-  Reed). The model hears those voices as other words ("PAID OUT", "HEY DAUGHTER"). They fall back to standard.
-- **TV stream:** 107 s of ordinary speech with "hey <other name>" lines, 0 hits for every phrase.
+Standard rows not shown (nova, maximilian, the rare name) are unchanged. "hey john" FA is 0 everywhere; the TV stream
+(107 s of ordinary speech with "hey <other name>" lines) gives 0 wakes for every phrase and setting.
+
+- **Takes:** 212 attempts gave 188 agreeing takes and 1 voice stuck below three (before: 222 attempts, 182 ticks,
+  3 stuck). In the bug flow "hey john" never joined a calibrated group; once it was the only take of a voice that
+  then fell back to standard settings.
+- **FA above before:** "hey nova" 8 against 6 of 528, all from Reed, whom the old judge refused ("a different name";
+  stuck at 2 ticks, standard settings) and who now tunes 4 of 4 and catches 6 of 6. The extra hits are "hey noah".
+- **The pause, synthetically:** `say` voices don't reproduce the pause dependence on standard settings (before: 9 of
+  32 fast with and without the pause); the token path above is the mechanism, and the fix moves standard "hey trey"
+  fast TA from 28.1% to 40.6%.
+- **After tuning, rushed:** tuned fast TA is the same as before (59.4%): the old calibration already added the "tray"
+  spelling. Further gains need the rushed `▁DR A Y` forms, which answer "hey dre" (see Rejected).
 
 ## Resources
 
-`HEYDOT_ENGINE_PROBE=1 HEYDOT_ENGINE_CONFIG=N swift test --filter engineCostProbe`, one configuration per process.
-Each measurement is 120 s of audio in 683-sample buffers, run through the live path.
-
-| | Idle CPU (one core) | Active CPU | Model RSS |
-|---|---|---|---|
-| Before, standard short name (2 runs) | 1.65-1.66% | 1.64-1.68% | +40.0-42.2 MiB |
-| After, standard short name | 1.68% | 1.76% | +44.0 MiB |
-| After, tuned short name (3 learned) | 1.63% | 1.63% | +42.7 MiB |
-| After, tuned rare name (3 learned) | 1.66% | 1.71% | +41.0 MiB |
-
-All within run-to-run noise. Learned sequences only add context-graph paths, and the beam stays 4.
-- **Tuning only:** the decoder replaces the old preview spotter (one model either way), about 21 ms per utterance.
-- **Calibration:** releases the decoder before loading its probe spotter, so one model at a time. It took 1.4 to
-  1.8 s for 8 clips.
+Not re-measured. The listener spots one written phrase as before (a different spelling for some names) plus at most
+as many learned sequences as before. Calibration runs the decoder once per take, then releases it before the probe
+spotter loads (one model at a time), as before; `calibration` stays under 2 s.
 
 ## Not verified
 
-  Synthetic voices are cleaner and more uniform than live speech.
-- **Live behaviour:** no live call or idle measurement was run on the installed app.
+- **Live speech:** synthetic voices are cleaner and more uniform than a person. The owner's own rushed "Hey Trey"
+  was not recorded or replayed. A speaker-to-microphone loop on the agent Mac was not possible: its output is
+  muted and the test process has no microphone permission.
+- **Installed app:** no live tuning session or wake was run in the app; the tuning screens were checked with
+  `HeyDot --qa-render` only.

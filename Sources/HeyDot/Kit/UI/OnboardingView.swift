@@ -275,7 +275,7 @@ struct OnboardingView: View {
             voiceHeading.padding(.top, 16)
             if flow.calibration == nil {
                 VStack(spacing: 14) {
-                    if flow.stage == .phrase || flow.stage == .permission { phraseSlots } else { otherChips }
+                    phraseSlots
                     voiceStatus
                     if flow.micStatus == .authorized {
                         HStack(spacing: 16) { microphoneAccess; microphonePicker }
@@ -302,8 +302,7 @@ struct OnboardingView: View {
             case .permission: heading("Turn on the microphone", "HeyDot needs it to hear your wake word. Listening stays on this Mac.")
             case .phrase:
                 heading("Say \u{201C}\(flow.phraseTitle)\u{201D} \(Self.count(OnboardingModel.phraseTarget)) times",
-                        flow.tuningStarted ? "Pause briefly between each one." : "Press Start, then say it.")
-            case .others: heading("Now say something else", "So HeyDot learns what not to answer.")
+                        flow.tuningStarted ? "The way you usually say it, with a pause between each one." : "Press Start, then say it the way you usually do.")
             case .ready: heading("That\u{2019}s everything", "Continue to tune HeyDot to your voice.")
             }
         }
@@ -355,27 +354,6 @@ struct OnboardingView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(flow.phraseTitle), \(i + 1) of \(OnboardingModel.phraseTarget): \(heard ? "heard" : "not yet")")
                 .accessibilityAction(named: "Say again") { flow.retry(phrase: i) }
-            }
-        }
-    }
-
-    var otherChips: some View {
-        HStack(spacing: 8) {
-            ForEach(Array(flow.otherPrompts.enumerated()), id: \.offset) { i, text in
-                let heard = i < flow.negatives.count
-                let next = i == flow.negatives.count && flow.stage == .others && flow.listening
-                HStack(spacing: 6) {
-                    if heard { Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(mark) }
-                    Text("\u{201C}\(text)\u{201D}").lineLimit(1)
-                }
-                .font(.system(size: 14, weight: next ? .semibold : .regular))
-                .foregroundStyle(heard || next ? .primary : .secondary)
-                .padding(.horizontal, 12).frame(height: 30)
-                .background(next ? accent.opacity(0.14) : Color.primary.opacity(0.05), in: Capsule())
-                .contentShape(Capsule())
-                .onTapGesture { if heard { flow.retry(other: i) } }
-                .help(heard ? "Say this one again" : "")
-                .accessibilityAction(named: "Say again") { flow.retry(other: i) }
             }
         }
     }

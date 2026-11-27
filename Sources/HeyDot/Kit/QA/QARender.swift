@@ -173,32 +173,29 @@ enum QARender {
                 let t = Float(i)
                 return i < 18 ? -58 : (i % 23 < 13 ? -28 + 14 * sin(t * 0.9) * sin(t * 0.21) : -55)
             }
+            let takes = { (n: Int) in Array(repeating: Utterance(clip: [0], heard: ["▁HE", "Y", "▁DO", "T"]), count: n) }
             try both("onboarding-1-welcome") { flow(.welcome) }
             try both("onboarding-3-name") { flow(.name) }
             try both("onboarding-3b-name-wake-word") { flow(.name, tweak: { f in f.nameDraft = "Tray"; f.editPhrase(); f.phraseDraft = "Okay Tray" }) }
             try both("onboarding-3c-name-wake-word-reserved") { flow(.name, tweak: { f in f.nameDraft = "Tray"; f.editPhrase(); f.phraseDraft = "Hey Siri" }) }
             try both("onboarding-4a-voice-permission") { flow(.voice, mic: .notDetermined) }
             try both("onboarding-4b-voice-listening") { flow(.voice, tweak: { f in
-                f.positives = [[0], [0]]; f.listening = true; f.tuningStarted = true; f.levels.set(speech)
+                f.takes = takes(2); f.listening = true; f.tuningStarted = true; f.levels.set(speech)
             }) }
-            try both("onboarding-4h-voice-different-name") { flow(.voice, tweak: { f in
-                f.positives = [[0]]; f.listening = true; f.tuningStarted = true; f.levels.set(speech)
-                f.hint = "That sounded like \u{201C}Hey John\u{201D}, a different name. Say \u{201C}\(f.phraseTitle)\u{201D}."
+            try both("onboarding-4h-voice-sounded-different") { flow(.voice, tweak: { f in
+                f.takes = takes(1); f.listening = true; f.tuningStarted = true; f.levels.set(speech)
+                f.hint = "That one sounded different from your others. Say it the way you usually do."
             }) }
             try both("onboarding-4c-voice-no-audio") { flow(.voice, tweak: { f in f.tuningStarted = true; f.problem = .noAudio }) }
             try both("onboarding-4f-voice-start") { flow(.voice) }
             try both("onboarding-4g-voice-permission-denied") { flow(.voice, mic: .denied) }
             try both("onboarding-3d-name-design-later") { flow(.name, tweak: { $0.designDeferred = true }) }
             try both("onboarding-6c-done-design-later", { flow(.done, settings: { $0.dotURL = "https://chatgpt.com/dots/sol" }, tweak: { $0.designDeferred = true }) })
-            try both("onboarding-4d-voice-something-else") { flow(.voice, tweak: { f in
-                f.positives = [[0], [0], [0], [0]]; f.negatives = [[0]]
-                f.listening = true; f.tuningStarted = true; f.levels.set(speech)
-            }) }
             try both("onboarding-4e-voice-tuned") { flow(.voice, settings: { $0.calibrationNote = "Caught 4 of 4, no false hits." }, tweak: { f in
-                f.positives = [[0], [0], [0], [0]]; f.negatives = [[0], [0], [0]]
+                f.takes = takes(4)
                 let t = Tuning(settings: WakeSettings(), caught: 4, falseHits: 0, note: "Caught 4 of 4, no false hits.")
                 f.calibration = t
-                f.tuningSummary = OnboardingModel.summary(t, phrase: "Hey Dot", positives: 4, negatives: 3)
+                f.tuningSummary = OnboardingModel.summary(t, phrase: "Hey Dot", positives: 4)
             }) }
             try both("onboarding-5a-connect-builtin") { flow(.connect, signedIn: false, tweak: { $0.webSignedIn = false }) }
             try both("onboarding-5b-connect-builtin-signed-in") { flow(.connect, tweak: { f in
@@ -247,7 +244,7 @@ enum QARender {
             for (name, design) in AccentBoard.samples {
                 try both("accent-\(name)-popover") { popover(model { $0.design = design; $0.dotName = "Dot" }) }
                 try both("accent-\(name)-voice") { flow(.voice, settings: { $0.design = design }, tweak: { f in
-                    f.positives = [[0], [0]]; f.listening = true; f.tuningStarted = true; f.levels.set(speech)
+                    f.takes = takes(2); f.listening = true; f.tuningStarted = true; f.levels.set(speech)
                 }) }
             }
             // The sign-in window's header (the page itself is chatgpt.com, rendered by --qa-signin).

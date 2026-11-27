@@ -54,7 +54,7 @@ private func fixture(_ name: String) throws -> Clip {
     }
     @Test func segmenterSplitsUtterancesForTuning() throws {
         // Live tuning feeds ~43 ms buffers; two utterances separated by a second of silence must come
-        // out as two clips, and the lenient preview must hear the phrase only in the first.
+        // out as two clips, each a plausible take.
         let silence = Clip(repeating: 0, count: 16000)
         let stream = silence + (try fixture("hey-tray-Samantha")) + silence + (try fixture("hey-there")) + silence
         var segmenter = UtteranceSegmenter()
@@ -65,8 +65,7 @@ private func fixture(_ name: String) throws -> Clip {
         #expect(clips.count == 2)
         #expect(segmenter.heardSound)
         let decoder = try PhraseDecoder(directory: ModelFiles.locate())
-        #expect(Hearing.judge(heard: decoder.pieces(clips[0]), phrase: "hey tray") == .phrase)
-        #expect(Hearing.judge(heard: decoder.pieces(clips[1]), phrase: "hey tray") != .phrase)
+        for clip in clips { #expect(Takes.problem(Utterance(clip: clip, heard: decoder.pieces(clip)), phrase: "hey tray") == nil) }
     }
 
     @Test func tuningKeepsFastPhraseBeforePrerollFills() throws {
@@ -81,29 +80,25 @@ private func fixture(_ name: String) throws -> Clip {
             }
             #expect(clips.count == 1)
             for clip in clips {
-                #expect(Hearing.judge(heard: decoder.pieces(clip), phrase: "hey dot") == .phrase)
+                #expect(Takes.problem(Utterance(clip: clip, heard: decoder.pieces(clip)), phrase: "hey dot") == nil)
             }
         }
     }
 
-    /// A neutral synthetic rare-name regression: reject a different name, learn heard tokens,
-    /// then catch a held-out wake utterance without answering confusables. The alternate spelling
-    /// Lumynaropolis deliberately differs from the synthetic spoken name Luminaropolis.
+    /// A neutral synthetic rare-name regression: the user's takes agree and "Hey John" stays out of them,
+    /// calibration learns the heard tokens, then a held-out wake utterance fires without answering confusables.
+    /// The alternate spelling Lumynaropolis deliberately differs from the synthetic spoken name Luminaropolis.
     @Test func heyJohnIsNotHeyLuminaropolis() async throws {
         let phrase = "hey lumynaropolis"
         let decoder = try PhraseDecoder(directory: ModelFiles.locate())
         let john = try ["hey-john-Daniel", "hey-john-Samantha"].map(fixture)
         let confusables = try john + ["hey-jeff-Daniel", "luminaropolis-Daniel", "hey-there", "hey-tray-Daniel"].map(fixture)
-        for clip in john {
-            guard case .otherName = Hearing.judge(heard: decoder.pieces(clip), phrase: phrase) else { Issue.record("Hey John heard as \(Hearing.judge(heard: decoder.pieces(clip), phrase: phrase))"); continue }
-        }
-        #expect(Hearing.judge(heard: decoder.pieces(try fixture("hey-jeff-Daniel")), phrase: phrase) != .phrase)
-        #expect(Hearing.judge(heard: decoder.pieces(try fixture("luminaropolis-Daniel")), phrase: phrase) != .phrase)
         let enrolled = try [150, 165, 195].map { try fixture("hey-luminaropolis-Daniel-\($0)") }
-        for clip in enrolled { #expect(Hearing.judge(heard: decoder.pieces(clip), phrase: phrase) == .phrase) }
+        let takes = [enrolled[0], john[0], enrolled[1], enrolled[2]].map(decoder.pieces)
+        #expect(Takes.agreeing(takes) == [0, 2, 3], "Hey John is not one of the user's takes")
         let heldOut = try fixture("hey-luminaropolis-Daniel-170")
 
-        let standard = try Spotter(settings: WakeSettings(phrase: phrase, spellings: Enroller.spellings(phrase)), directory: ModelFiles.locate())
+        let standard = try Spotter(settings: WakeSettings(phrase: phrase), directory: ModelFiles.locate())
         #expect(try standard.detect(heldOut) == 0, "root cause: the spelled tokens never match what the model hears")
 
         let result = try await Enroller().calibrate(phrase: phrase, positives: enrolled, negatives: [john[0]])
@@ -115,27 +110,35 @@ private func fixture(_ name: String) throws -> Clip {
         for clip in confusables { #expect(try tuned.detect(clip) == 0) }
     }
 
-    /// Tuning's tick, including deterministic sound-alike examples.
-    @Test func judgeTellsTheNameApartBySound() {
+    /// Rushed "Hey Trey" (no pause after "hey") must wake on standard settings. The spotter fires only on an exact
+    /// token path, and the spelled `▁T RE Y` is not what the model hears for "Trey" (`▁TRA Y`, rushed `▁DR A Y` or
+    /// `▁HA T RE Y`); a careful T after a pause can still be pulled onto the spelled path, a rushed one cannot.
+    @Test func rushedHeyTreyWakesOnStandardSettings() throws {
+        let spotter = try Spotter(settings: WakeSettings(phrase: "hey trey"), directory: ModelFiles.locate())
+        for name in ["hey-trey-Karen-340", "hey-trey-Daniel-300"] { #expect(try spotter.detect(fixture(name)) == 1, "\(name)") }
+        for name in ["hey-there", "hey-jarvis", "hey-john-Daniel", "hey-jeff-Daniel", "hey-dot-Karen"] {
+            #expect(try spotter.detect(fixture(name)) == 0, "\(name)")
+        }
+    }
+
+    /// Takes are compared with each other by sound, never with the spelling, and word breaks don't matter.
+    @Test func takesAgreeByHowTheySound() {
         func heard(_ text: String) -> [String] { text.split(separator: " ").map { "▁" + $0 } }
-        #expect(Hearing.judge(heard: heard("HEY TRAY"), phrase: "hey tray") == .phrase)
-        #expect(Hearing.judge(heard: heard("HAYDRAY"), phrase: "hey tray") == .phrase)
-        #expect(Hearing.judge(heard: heard("PAY THREE"), phrase: "hey tray") == .phrase)
-        #expect(Hearing.judge(heard: heard("HEY TROY"), phrase: "hey tray") == .otherName("HEY TROY"))
-        #expect(Hearing.judge(heard: heard("HEY RAY"), phrase: "hey tray") == .otherName("HEY RAY"))
-        #expect(Hearing.judge(heard: heard("HEY JOHN"), phrase: "hey tray") == .otherName("HEY JOHN"))
-        #expect(Hearing.judge(heard: heard("TRAY"), phrase: "hey tray") == .missingStart("TRAY"))
-        #expect(Hearing.judge(heard: [], phrase: "hey tray") == .nothing)
-        #expect(Hearing.judge(heard: heard("HEY DON'T"), phrase: "hey dot") == .phrase)
-        #expect(Hearing.judge(heard: heard("HEY DON"), phrase: "hey dot") != .phrase)
-        #expect(Hearing.judge(heard: heard("HEY LUMINA ROPOLIS"), phrase: "hey luminaropolis") == .phrase)
-        #expect(Hearing.judge(heard: heard("HEY JEFF"), phrase: "hey luminaropolis") != .phrase)
-        #expect(Hearing.judge(heard: heard("HEY PAPA TO PALACE"), phrase: "hey luminaropolis") != .phrase)
-        // Ticks, but too loose to learn: these sequences would fire on "hey don" and "hey dre".
-        #expect(!Hearing.learnable(heard: heard("HEY DON'T"), phrase: "hey dot"))
-        #expect(!Hearing.learnable(heard: heard("HEY DRAY"), phrase: "hey tray"))
-        #expect(Hearing.learnable(heard: heard("HEY TRAY"), phrase: "hey tray"))
-        #expect(Hearing.learnable(heard: heard("HEY LUMINA ROPOLIS"), phrase: "hey luminaropolis"))
+        // One speaker's "Hey Trey", careful and rushed, as the model hears it.
+        let trey = ["HEY TRAY", "HA T RE Y", "HEY DRAY", "HEY TREE"].map(heard)
+        #expect(Takes.agreeing(trey) == [0, 1, 2, 3])
+        #expect(Takes.agreeing([heard("HEY JOHN")] + trey) == [1, 2, 3, 4], "a stray first take drops out")
+        #expect(Takes.agreeing(trey + [heard("HEY JOHN"), heard("TRAY")]) == [0, 1, 2, 3])
+        // A speaker the model always hears as "Page Ray" agrees with themselves.
+        #expect(Takes.agreeing(["P AGE RA Y", "PA ID RA Y", "P AGE RA Y"].map { $0.split(separator: " ").map(String.init) }).count == 3)
+        // Only a reading the user repeats is theirs; one "HEY DRAY" among "HEY TRAY"s is a mishearing.
+        #expect(Takes.repeated(heard("HEY TRAY"), among: trey + [heard("HEY TRAY")]) && !Takes.repeated(heard("HEY DRAY"), among: trey))
+        func problem(_ text: String, peak: Float = 0.3) -> Takes.Problem? {
+            Takes.problem(Utterance(clip: [peak] + Clip(repeating: 0, count: 15999), heard: heard(text)), phrase: "hey trey")
+        }
+        #expect(problem("HEY TRAY") == nil && problem("HEY A TREE") == nil)
+        #expect(problem("") == .nothing && problem("", peak: 0.01) == .quiet)
+        #expect(problem("I M MAKING A CUP OF COFFEE") == .long)
     }
 
     @Test func thresholdKeepsAMarginFromEveryRecordedNegative() {
@@ -155,6 +158,6 @@ private func fixture(_ name: String) throws -> Clip {
         #expect(try JSONDecoder().decode(WakeSettings.self, from: JSONEncoder().encode(learned)) == learned)
         // A stored sequence with a piece the model doesn't have is ignored, not fatal.
         let keywords = try Spotter.keywords(WakeSettings(phrase: "hey tray", learned: ["▁HE Y ▁NOT_A_PIECE", "▁HE Y ▁TRA Y"]), tokenizer: KeywordTokenizer())
-        #expect(keywords == [["▁HE", "Y", "▁TRA", "Y"]])
+        #expect(keywords.first == ["▁HE", "Y", "▁TRA", "Y"] && !keywords.contains { $0.contains("▁NOT_A_PIECE") })
     }
 }

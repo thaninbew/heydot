@@ -10,9 +10,8 @@ import Testing
 //
 // Speech comes from macOS `say` (synthetic voices, no personal recordings), cached outside the repository under
 // HEYDOT_EVAL_CACHE (default /tmp/heydot-eval-cache), keyed by voice, rate and text, so reruns skip synthesis.
-// Noisy copies are mixed deterministically (seeded) at run time. The baseline at 15a3cad was measured by the
-// earlier version of this file (preview tick, any phrase-length utterance ticked); this one simulates the current
-// tuning screen: a slot ticks only when Hearing.judge hears the phrase, the user repeats until four tick.
+// Noisy copies are mixed deterministically (seeded) at run time. This file simulates the current tuning screen:
+// a take counts when it is plausible and agrees with the user's other takes (`Takes`), until four agree.
 
 private enum AccuracyEval {
     // MARK: Corpus
@@ -20,18 +19,26 @@ private enum AccuracyEval {
     /// English voices with varied accents and genders; novelty voices are skipped.
     static let voices = ["Samantha", "Daniel", "Karen", "Moira", "Rishi", "Tessa", "Eddy (English (US))", "Reed (English (UK))"]
     static let testRates = [140, 175, 210]
+    /// Rushed speech: `say` runs the words together at these rates, with no pause after "hey".
+    static let fastRates = [260, 320]
     static let enrollRates = [150, 165, 190, 200]
     /// Further attempts when a sample doesn't tick (the user says it again).
     static let retryRates = [155, 180, 195, 205]
-    /// Rate for the tuning screen's "other phrases" and for the bug flow's mistaken "hey john" positive.
+    /// Rate for the bug flow's mistaken "hey john" take.
     static let negativeRate = 165
     static let babbleRate = 175, tvRate = 175
 
-    static let phrases = ["hey luminaropolis", "hey tray", "hey dot", "hey nova", "hey maximilian"]
+    /// HEYDOT_EVAL_PHRASES (comma-separated) and HEYDOT_EVAL_SCENARIOS (Scenario names) narrow a run while iterating.
+    static let phrases = only("HEYDOT_EVAL_PHRASES") ?? ["hey luminaropolis", "hey tray", "hey trey", "hey dot", "hey nova", "hey maximilian"]
+    static let scenarios = only("HEYDOT_EVAL_SCENARIOS")?.compactMap { name in Scenario.allCases.first { "\($0)" == name } } ?? Scenario.allCases
+    static func only(_ key: String) -> [String]? {
+        ProcessInfo.processInfo.environment[key].map { $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }
+    }
     /// Similar-sounding names per phrase. Homophone spellings of the phrase itself ("hey tray") are not confusables.
     static let similar: [String: [String]] = [
         "hey luminaropolis": ["hey lumina", "hey lunar", "hey metropolis"],
         "hey tray": ["hey ray", "hey troy", "hey dre"],
+        "hey trey": ["hey ray", "hey troy", "hey dre"],
         "hey dot": ["hey don", "hey doc", "hey dad"],
         "hey nova": ["hey noah", "hey nora", "hey nolan"],
         "hey maximilian": ["hey max", "hey maxwell", "hey million"],
@@ -41,6 +48,10 @@ private enum AccuracyEval {
     static func name(_ phrase: String) -> String {
         phrase.split(separator: " ").dropFirst().joined(separator: " ")
     }
+    /// The phrase with half a second of silence after its first word (`say` embedded command), said fast.
+    static func paused(_ phrase: String) -> String {
+        "\(phrase.split(separator: " ")[0]) [[slnc 500]] \(name(phrase))"
+    }
     /// Everything that must be rejected for `phrase`.
     static func confusables(_ phrase: String) -> [String] {
         var out: [String] = []
@@ -48,12 +59,6 @@ private enum AccuracyEval {
         where text != phrase && !out.contains(text) { out.append(text) }
         return out
     }
-    /// What the voice tuning screen collects as "other phrases" (OnboardingModel.otherPrompts: the start with a
-    /// different name, the name alone, "Hey there"). Change this one function when the tuning UI changes.
-    static func tuningNegatives(_ phrase: String) -> [String] {
-        [phrase.contains("john") ? "hey sam" : "hey john", name(phrase), "hey there"]
-    }
-
     /// Ordinary "TV" sentences mixed under noisy test clips (spoken by a different voice).
     static let babble = [
         "the weather tomorrow looks cloudy with a chance of rain in the afternoon",
@@ -170,34 +175,41 @@ private enum AccuracyEval {
     }
 
     enum Scenario: String, Sendable, CaseIterable {
-        case standard = "Standard", preview = "Tuning tick (Hearing.judge)", honest = "Tuned (honest user)", bug = "Tuned (owner bug flow)"
+        case standard = "Standard", honest = "Tuned", bug = "Tuned (owner bug flow)"
     }
 
     struct Outcome: Sendable {
         let scenario: Scenario, phrase: String
         var voice: String? = nil
-        var taClean = Tally(), taNoisy = Tally()
-        var fa: [String: Tally] = [:]
+        /// Positives at the test rates (clean, noisy), rushed at the fast rates, and fast with a pause after "hey".
+        var taClean = Tally(), taNoisy = Tally(), taFast = Tally(), taPaused = Tally()
+        /// Confusables at the test rates and at the fast rates.
+        var fa: [String: Tally] = [:], faFast: [String: Tally] = [:]
         var settings: WakeSettings? = nil
         var caught = 0, falseHits = 0, enrolled = 0
-        /// Tuning flow: attempts spoken, slots ticked, whether the user's "hey john" ticked, voices that could not
-        /// reach the three ticks Continue needs (they fall back to standard settings, like Later).
+        /// Tuning flow: attempts spoken, takes that agreed, whether the user's "hey john" was among them, voices
+        /// that could not reach the three takes Continue needs (they fall back to standard settings, like Later).
         var attempts = 0, ticks = 0, johnTicked = 0, stuck = 0
+        /// Wakes on the TV stream with these settings.
+        var tv = 0
         var ta: Tally { taClean + taNoisy }
         var faAll: Tally { fa.values.reduce(Tally(), +) }
+        var faFastAll: Tally { faFast.values.reduce(Tally(), +) }
         static func + (a: Outcome, b: Outcome) -> Outcome {
             var o = a; o.voice = nil; o.taClean = a.taClean + b.taClean; o.taNoisy = a.taNoisy + b.taNoisy
-            o.fa = a.fa.merging(b.fa, uniquingKeysWith: +); o.caught += b.caught; o.falseHits += b.falseHits; o.enrolled += b.enrolled
-            o.attempts += b.attempts; o.ticks += b.ticks; o.johnTicked += b.johnTicked; o.stuck += b.stuck
+            o.taFast = a.taFast + b.taFast; o.taPaused = a.taPaused + b.taPaused
+            o.fa = a.fa.merging(b.fa, uniquingKeysWith: +); o.faFast = a.faFast.merging(b.faFast, uniquingKeysWith: +)
+            o.caught += b.caught; o.falseHits += b.falseHits; o.enrolled += b.enrolled
+            o.attempts += b.attempts; o.ticks += b.ticks; o.johnTicked += b.johnTicked; o.stuck += b.stuck; o.tv += b.tv
             return o
         }
     }
 
     struct Corpus: Sendable {
         let clean: [Utt: Clip], dirty: [Utt: Clip]
-        /// Test clips of `text` by `voice`: every test rate, clean and noisy.
-        func test(_ text: String, _ voice: String) -> [(clip: Clip, noisy: Bool)] {
-            testRates.flatMap { r -> [(clip: Clip, noisy: Bool)] in
+        /// Clips of `text` by `voice` at `rates`, clean and noisy.
+        func test(_ text: String, _ voice: String, rates: [Int] = testRates) -> [(clip: Clip, noisy: Bool)] {
+            rates.flatMap { r -> [(clip: Clip, noisy: Bool)] in
                 let u = Utt(voice: voice, rate: r, text: text)
                 return [(clean[u]!, false), (dirty[u]!, true)]
             }
@@ -211,65 +223,56 @@ private enum AccuracyEval {
                 let hit = try spotter.detect(t.clip) > 0
                 if t.noisy { o.taNoisy.add(hit) } else { o.taClean.add(hit) }
             }
+            for t in corpus.test(o.phrase, voice, rates: fastRates) { o.taFast.add(try spotter.detect(t.clip) > 0) }
+            for t in corpus.test(paused(o.phrase), voice, rates: fastRates) { o.taPaused.add(try spotter.detect(t.clip) > 0) }
             for text in confusables(o.phrase) {
                 for t in corpus.test(text, voice) { o.fa[text, default: Tally()].add(try spotter.detect(t.clip) > 0) }
+                for t in corpus.test(text, voice, rates: fastRates) { o.faFast[text, default: Tally()].add(try spotter.detect(t.clip) > 0) }
             }
         }
     }
 
-    static func fixed(_ scenario: Scenario, _ phrase: String, corpus: Corpus) throws -> Outcome {
+    static func fixed(_ phrase: String, corpus: Corpus, tv audio: Clip) throws -> Outcome {
         let settings = WakeSettings(phrase: phrase)
-        var o = Outcome(scenario: scenario, phrase: phrase, settings: settings)
+        var o = Outcome(scenario: .standard, phrase: phrase, settings: settings)
         try measure(try Spotter(settings: settings, directory: ModelFiles.locate()), &o, voices: voices, corpus: corpus)
+        o.tv = try tvHits(settings, stream: audio)
         return o
     }
 
-    /// The tuning screen's tick on every test clip: TA = the phrase ticks a slot, FA = a confusable ticks one.
-    static func tick(_ phrase: String, corpus: Corpus) throws -> Outcome {
-        let decoder = try PhraseDecoder(directory: ModelFiles.locate())
-        var o = Outcome(scenario: .preview, phrase: phrase)
-        for voice in voices {
-            for t in corpus.test(phrase, voice) {
-                let hit = Hearing.judge(heard: decoder.pieces(t.clip), phrase: phrase) == .phrase
-                if t.noisy { o.taNoisy.add(hit) } else { o.taClean.add(hit) }
-            }
-            for text in confusables(phrase) {
-                for t in corpus.test(text, voice) { o.fa[text, default: Tally()].add(Hearing.judge(heard: decoder.pieces(t.clip), phrase: phrase) == .phrase) }
-            }
-        }
-        return o
-    }
-
-    /// Simulates the tuning screen for one speaker: attempts in order (the bug flow says "hey john" second), a slot
-    /// ticks only when Hearing.judge hears the phrase, until four tick or the attempts run out; then the other
-    /// phrases, and Continue (Enroller.calibrate) once at least three ticked. Otherwise the user takes Later.
-    static func tuned(_ scenario: Scenario, _ phrase: String, voice: String, corpus: Corpus) async throws -> Outcome {
+    /// Simulates the tuning screen for one speaker (OnboardingModel.heard): attempts in order (the bug flow says
+    /// "hey john" second); a plausible recording is a take, and the takes that agree count, until four agree or
+    /// the attempts run out. Then Continue (Enroller.calibrate) once at least three agree; otherwise the user takes
+    /// Later.
+    static func tuned(_ scenario: Scenario, _ phrase: String, voice: String, corpus: Corpus, tv audio: Clip) async throws -> Outcome {
         let decoder = try PhraseDecoder(directory: ModelFiles.locate())
         var attempts = (enrollRates + retryRates).map { (clip: corpus.clip(voice, $0, phrase), john: false) }
         if scenario == .bug { attempts.insert((corpus.clip(voice, negativeRate, "hey john"), true), at: 1) }
-        var positives: [Clip] = [], spoken = 0, johnTicked = 0
-        for a in attempts where positives.count < 4 {
+        var takes: [Utterance] = [], johns: [Bool] = [], spoken = 0
+        for a in attempts where Takes.agreeing(takes.map(\.heard)).count < 4 {
             spoken += 1
-            guard Hearing.judge(heard: decoder.pieces(a.clip), phrase: phrase) == .phrase else { continue }
-            if a.john { johnTicked += 1 }
-            positives.append(a.clip)
+            let u = Utterance(clip: a.clip, heard: decoder.pieces(a.clip))
+            guard Takes.problem(u, phrase: phrase) == nil else { continue }
+            takes.append(u); johns.append(a.john)
         }
-        let negatives = tuningNegatives(phrase).map { corpus.clip(voice, negativeRate, $0) }
+        let agreeing = Takes.agreeing(takes.map(\.heard))
+        let positives = agreeing.map { takes[$0].clip }
         var o = Outcome(scenario: scenario, phrase: phrase, voice: voice, enrolled: positives.count)
-        o.attempts = spoken; o.ticks = positives.count; o.johnTicked = johnTicked
+        o.attempts = spoken; o.ticks = positives.count; o.johnTicked = agreeing.filter { johns[$0] }.count
         if positives.count >= 3 {
-            let cal = try await Enroller().calibrate(phrase: phrase, positives: positives, negatives: negatives)
+            let cal = try await Enroller().calibrate(phrase: phrase, positives: positives, negatives: [])
             o.settings = cal.settings; o.caught = cal.caught; o.falseHits = cal.falseHits
         } else {
             o.settings = WakeSettings(phrase: phrase); o.stuck = 1
         }
         try measure(try Spotter(settings: o.settings!, directory: ModelFiles.locate()), &o, voices: [voice], corpus: corpus)
+        o.tv = try tvHits(o.settings!, stream: audio)
         return o
     }
 
     /// One continuous stream through one keyword stream, in 1280-sample chunks like the live listener.
-    static func tvHits(_ phrase: String, stream audio: Clip) throws -> Int {
-        let spotter = try Spotter(settings: WakeSettings(phrase: phrase), directory: ModelFiles.locate())
+    static func tvHits(_ settings: WakeSettings, stream audio: Clip) throws -> Int {
+        let spotter = try Spotter(settings: settings, directory: ModelFiles.locate())
         let s = try spotter.stream(); defer { SherpaOnnxDestroyOnlineStream(s) }
         var hits = 0
         for o in stride(from: 0, to: audio.count, by: 1280) { hits += spotter.accept(Array(audio[o..<min(o + 1280, audio.count)]), stream: s) }
@@ -292,10 +295,11 @@ private enum AccuracyEval {
     var testTexts = Set<String>()
     for phrase in E.phrases { testTexts.insert(phrase); testTexts.formUnion(E.confusables(phrase)) }
     for voice in E.voices {
-        for text in testTexts { for r in E.testRates { needed.insert(.init(voice: voice, rate: r, text: text)) } }
+        for text in testTexts { for r in E.testRates + E.fastRates { needed.insert(.init(voice: voice, rate: r, text: text)) } }
         for phrase in E.phrases {
+            for r in E.fastRates { needed.insert(.init(voice: voice, rate: r, text: E.paused(phrase))) }
             for r in E.enrollRates + E.retryRates { needed.insert(.init(voice: voice, rate: r, text: phrase)) }
-            for text in E.tuningNegatives(phrase) + ["hey john"] { needed.insert(.init(voice: voice, rate: E.negativeRate, text: text)) }
+            needed.insert(.init(voice: voice, rate: E.negativeRate, text: "hey john"))
         }
         for text in E.babble { needed.insert(.init(voice: voice, rate: E.babbleRate, text: text)) }
     }
@@ -306,7 +310,8 @@ private enum AccuracyEval {
     var clean: [E.Utt: Clip] = [:]
     for u in needed { clean[u] = try OfflineDetector.readWAV(E.file(u)) }
     var dirty: [E.Utt: Clip] = [:]
-    for u in needed where E.testRates.contains(u.rate) && testTexts.contains(u.text) {
+    let noisyTexts = testTexts.union(E.phrases.map(E.paused))
+    for u in needed where (E.testRates + E.fastRates).contains(u.rate) && noisyTexts.contains(u.text) {
         let h = E.fnv(u.key), others = E.voices.filter { $0 != u.voice }
         let babble = clean[.init(voice: others[Int(h % UInt64(others.count))], rate: E.babbleRate, text: E.babble[Int((h >> 8) % UInt64(E.babble.count))])]!
         dirty[u] = E.noisy(clean[u]!, babble: babble, seed: h)
@@ -317,21 +322,16 @@ private enum AccuracyEval {
 
     // Measure everything concurrently; every job owns its own Spotter (reused across that job's clips).
     var outcomes: [E.Outcome] = []
-    var tv: [String: Int] = [:]
-    try await withThrowingTaskGroup(of: (E.Outcome?, (String, Int)?).self) { group in
+    try await withThrowingTaskGroup(of: E.Outcome.self) { group in
         for phrase in E.phrases {
-            group.addTask { (try E.fixed(.standard, phrase, corpus: corpus), nil) }
-            group.addTask { (try E.tick(phrase, corpus: corpus), nil) }
-            group.addTask { (nil, (phrase, try E.tvHits(phrase, stream: tvAudio))) }
+            if E.scenarios.contains(.standard) { group.addTask { try E.fixed(phrase, corpus: corpus, tv: tvAudio) } }
             for voice in E.voices {
-                group.addTask { (try await E.tuned(.honest, phrase, voice: voice, corpus: corpus), nil) }
-                group.addTask { (try await E.tuned(.bug, phrase, voice: voice, corpus: corpus), nil) }
+                for s in E.scenarios where s != .standard {
+                    group.addTask { try await E.tuned(s, phrase, voice: voice, corpus: corpus, tv: tvAudio) }
+                }
             }
         }
-        for try await (o, t) in group {
-            if let o { outcomes.append(o) }
-            if let t { tv[t.0] = t.1 }
-        }
+        for try await o in group { outcomes.append(o) }
     }
     let measured = ContinuousClock.now
 
@@ -344,61 +344,55 @@ private enum AccuracyEval {
     let count = { (s: Duration) in String(format: "%.1f s", Double(s.components.seconds) + Double(s.components.attoseconds) / 1e18) }
 
     out("# HeyDot wake accuracy (offline, macOS say)")
-    out("Voices: \(E.voices.joined(separator: ", ")). Test rates \(E.testRates), enrollment rates \(E.enrollRates), tuning negatives and bug-flow \"hey john\" at \(E.negativeRate).")
+    out("Voices: \(E.voices.joined(separator: ", ")). Test rates \(E.testRates), fast rates \(E.fastRates), enrollment rates \(E.enrollRates) then retries \(E.retryRates), bug-flow \"hey john\" at \(E.negativeRate).")
     out("Each test utterance is counted clean and noisy (white noise 25 dB SNR + another voice's sentence 12 dB under). Detected = detect(clip) > 0.")
-    out("Standard = WakeSettings(phrase:) as the live listener gets it after Later or a phrase change; Tuning tick = whether the tuning screen ticks a slot (Hearing.judge on what PhraseDecoder heard).")
-    out("Tuning negatives (honest user): \(E.tuningNegatives("hey <name>"))")
+    out("Standard = WakeSettings(phrase:) as the live listener gets it after Later or a phrase change. Fast = the phrase at the fast rates, no pause; fast paused = the same with 500 ms of silence after the first word.")
     out()
     for phrase in E.phrases {
-        let std = WakeSettings(phrase: phrase)
-        out("Phrase \"\(phrase)\": standard score \(f(std.score)) threshold \(f(std.threshold)) spellings \(std.spellings); Enroller.spellings \(Enroller.spellings(phrase)); confusables \(E.confusables(phrase))")
+        let tokenizer = try KeywordTokenizer()
+        let keywords = try Spotter.keywords(WakeSettings(phrase: phrase), tokenizer: tokenizer).map { $0.joined(separator: " ") }
+        out("Phrase \"\(phrase)\": standard keywords \(keywords); confusables \(E.confusables(phrase))")
     }
     out()
     out("## Summary (TA = true accept on positives, FA = false accept on confusables)")
     out()
-    out("| Phrase | Scenario | TA | TA clean | TA noisy | FA | FA \"hey john\" |")
-    out("|---|---|---|---|---|---|---|")
+    out("| Phrase | Scenario | TA | TA clean | TA noisy | TA fast | TA fast paused | FA | FA fast | FA \"hey john\" | TV wakes |")
+    out("|---|---|---|---|---|---|---|---|---|---|---|")
     for phrase in E.phrases {
-        for s in E.Scenario.allCases {
+        for s in E.scenarios {
             let o = aggregate(s, phrase)
-            out("| \(phrase) | \(s.rawValue) | \(o.ta.text) | \(o.taClean.text) | \(o.taNoisy.text) | \(o.faAll.text) | \(o.fa["hey john"]!.text) |")
+            out("| \(phrase) | \(s.rawValue) | \(o.ta.text) | \(o.taClean.text) | \(o.taNoisy.text) | \(o.taFast.text) | \(o.taPaused.text) | \(o.faAll.text) | \(o.faFastAll.text) | \((o.fa["hey john"]! + o.faFast["hey john"]!).text) | \(o.tv) |")
         }
     }
-    for s in [E.Scenario.honest, .bug] {
+    for s in E.scenarios where s != .standard {
         out()
-        out("## \(s.rawValue): per enrollment voice (judge-ticked positives\(s == .bug ? ", user said \"hey john\" as attempt 2" : "") + \(E.tuningNegatives("x").count) negatives)")
+        out("## \(s.rawValue): per enrollment voice (agreeing takes\(s == .bug ? ", user said \"hey john\" as attempt 2" : ""))")
         out()
         let flow = outcomes.filter { $0.scenario == s }.reduce(E.Outcome(scenario: s, phrase: ""), +)
-        out("Attempts \(flow.attempts), ticks \(flow.ticks), \"hey john\" ticked \(flow.johnTicked) times, voices stuck below three ticks \(flow.stuck).")
+        out("Attempts \(flow.attempts), agreeing takes \(flow.ticks), \"hey john\" counted \(flow.johnTicked) times, voices stuck below three takes \(flow.stuck).")
         out()
-        out("| Phrase | Voice | attempts | ticks | threshold | learned | caught/enrolled | false hits | TA | FA | FA \"hey john\" |")
-        out("|---|---|---|---|---|---|---|---|---|---|---|")
+        out("| Phrase | Voice | attempts | takes | threshold | learned | caught/enrolled | false hits | TA | TA fast | FA | FA fast |")
+        out("|---|---|---|---|---|---|---|---|---|---|---|---|")
         for phrase in E.phrases {
             for voice in E.voices {
                 guard let o = outcomes.first(where: { $0.scenario == s && $0.phrase == phrase && $0.voice == voice }), let st = o.settings else { continue }
-                out("| \(phrase) | \(voice) | \(o.attempts) | \(o.ticks) | \(f(st.threshold))\(o.stuck > 0 ? " (standard)" : "") | \(st.learned.count) | \(o.caught)/\(o.enrolled) | \(o.falseHits) | \(o.ta.text) | \(o.faAll.text) | \(o.fa["hey john"]!.text) |")
+                out("| \(phrase) | \(voice) | \(o.attempts) | \(o.ticks) | \(f(st.threshold))\(o.stuck > 0 ? " (standard)" : "") | \(st.learned.count) | \(o.caught)/\(o.enrolled) | \(o.falseHits) | \(o.ta.text) | \(o.taFast.text) | \(o.faAll.text) | \(o.faFastAll.text) |")
             }
         }
     }
-    for phrase in ["hey luminaropolis", "hey tray"] {
+    for phrase in E.phrases {
         out()
-        out("## Per-confusable false accepts: \"\(phrase)\"")
+        out("## Per-confusable false accepts: \"\(phrase)\" (test rates / fast rates)")
         out()
-        out("| Confusable | " + E.Scenario.allCases.map(\.rawValue).joined(separator: " | ") + " |")
-        out("|---|" + String(repeating: "---|", count: E.Scenario.allCases.count))
+        out("| Confusable | " + E.scenarios.map(\.rawValue).joined(separator: " | ") + " |")
+        out("|---|" + String(repeating: "---|", count: E.scenarios.count))
         for text in E.confusables(phrase) {
-            out("| \(text) | " + E.Scenario.allCases.map { aggregate($0, phrase).fa[text]!.text }.joined(separator: " | ") + " |")
+            out("| \(text) | " + E.scenarios.map { let o = aggregate($0, phrase); return "\(o.fa[text]!.hit) / \(o.faFast[text]!.hit)" }.joined(separator: " | ") + " |")
         }
     }
     out()
-    out("## TV stream false accepts (standard settings, one stream, 1280-sample chunks)")
-    out()
     let tvSeconds = Double(tvAudio.count) / 16000
-    out("Stream: \(String(format: "%.1f", tvSeconds)) s of ordinary speech from \(Set(E.tv.map(\.voice)).count) voices (includes hey Mike/John/Jeff/Ray/Tony/Don, Troy).")
-    out()
-    out("| Phrase | Hits | Hits per hour |")
-    out("|---|---|---|")
-    for phrase in E.phrases { out("| \(phrase) | \(tv[phrase]!) | \(String(format: "%.0f", Double(tv[phrase]!) * 3600 / tvSeconds)) |") }
+    out("TV stream: \(String(format: "%.1f", tvSeconds)) s of ordinary speech from \(Set(E.tv.map(\.voice)).count) voices (includes hey Mike/John/Jeff/Ray/Tony/Don, Troy), one keyword stream in 1280-sample chunks. Tuned TV wakes are summed over the 8 tuned speakers.")
     out()
     out("Utterances: \(needed.count) (\(fresh) newly synthesized). Cache: \(E.cache.path), \(E.cacheBytes() / 1024) KB.")
     out("Elapsed: synthesis \(count(synthesized - started)), measurement \(count(measured - synthesized)), total \(count(ContinuousClock.now - started)).")

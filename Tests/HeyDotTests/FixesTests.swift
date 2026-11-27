@@ -358,53 +358,48 @@ final class RecordingTuner: VoiceTuner {
 }
 
 
-// MARK: Voice tuning: truthful feedback, retry and Start over
+// MARK: Voice tuning: the user's own takes, retry and Start over
 
-@MainActor @Test func tuningNeverCountsADifferentNameAsTheWakePhrase() {
+private func take(_ words: String, level: Float = 0.1) -> Utterance {
+    Utterance(clip: Clip(repeating: level, count: 16000), heard: words.split(separator: " ").map { "▁" + $0 })
+}
+
+@MainActor @Test func tuningCountsTheUsersOwnWayOfSayingThePhrase() {
     let (f, _, _) = tuningFlow()
     f.startListening()
-    let clip = Clip(repeating: 0.1, count: 16000)
-    f.heard(Utterance(clip: clip, hearing: .otherName("HEY JOHN")))
-    #expect(f.positives.isEmpty, "Hey John must not tick a slot")
-    #expect(f.hint?.contains("Hey John") == true && f.hint?.contains("different name") == true)
-    f.heard(Utterance(clip: clip, hearing: .missingStart("LUMINA ROPOLIS")))
-    f.heard(Utterance(clip: clip, hearing: .nothing))
-    #expect(f.positives.isEmpty)
-    f.heard(Utterance(clip: clip, hearing: .phrase))
-    #expect(f.positives.count == 1 && f.hint == "Heard it.")
-    for _ in 0..<3 { f.heard(Utterance(clip: clip, hearing: .phrase)) }
-    #expect(f.stage == .others && f.otherPrompts.first == "Hey John")
-    // In the other-phrases stage the wake phrase itself is not stored as a negative.
-    f.heard(Utterance(clip: clip, hearing: .phrase))
-    #expect(f.negatives.isEmpty)
-    f.heard(Utterance(clip: clip, hearing: .otherName("HEY JOHN")))
-    #expect(f.negatives.count == 1)
+    // The model hears this speaker's "Hey Dot" as "Hey Daughter": their way, so it counts.
+    f.heard(take("HEY DAUGHTER"))
+    #expect(f.positives.count == 1 && f.hint == "Got it.")
+    f.heard(take("HEY JOHN"))
+    #expect(f.positives.count == 1, "a take unlike the others is not counted")
+    #expect(f.hint?.contains("different from your others") == true && f.hint?.contains("name") == false)
+    f.heard(take("", level: 0.001))
+    #expect(f.hint?.contains("quiet") == true)
+    f.heard(take(""))
+    #expect(f.hint?.contains("catch anything") == true)
+    f.heard(take("I M MAKING A CUP OF COFFEE"))
+    #expect(f.hint?.contains("longer") == true && f.positives.count == 1)
+    for words in ["HEY DAUGHTER", "HAY DOTTER", "HEY DOT"] { f.heard(take(words)) }
+    #expect(f.positives.count == 4 && f.stage == .ready && !f.listening, "four agreeing takes are everything tuning needs")
 }
 
 @MainActor @Test func eachSampleCanBeRetriedAndStartOverClearsEverything() {
     let (f, tuner, _) = tuningFlow()
     f.startListening()
-    let clip = Clip(repeating: 0.1, count: 16000)
-    for i in 0..<4 { f.heard(Utterance(clip: clip.map { $0 * Float(i + 1) }, hearing: .phrase)) }
-    f.heard(Utterance(clip: clip, hearing: .otherName("HEY JOHN")))
+    for i in 0..<4 { f.heard(take("HEY DOT", level: 0.1 * Float(i + 1))) }
+    f.heard(take("HEY JOHN"))
     f.retry(phrase: 1)
     #expect(f.positives.count == 3 && f.positives[1].first == 0.3 && f.stage == .phrase, "only that sample is cleared")
-    #expect(f.negatives.count == 1, "other phrases are kept")
+    f.heard(take("HEY DOT"))
     f.calibration = Tuning(settings: WakeSettings(), caught: 4, falseHits: 0, note: "")
-    f.retry(other: 0)
-    #expect(f.negatives.isEmpty && f.calibration == nil, "a retry invalidates the old result")
+    f.retry(phrase: 0)
+    #expect(f.calibration == nil, "a retry invalidates the old result")
     #expect(f.canStartOver)
     let starts = tuner.starts.count
     f.startOver()
-    #expect(f.positives.isEmpty && f.negatives.isEmpty && f.calibration == nil && f.hint == nil)
+    #expect(f.positives.isEmpty && f.calibration == nil && f.hint == nil)
     #expect(tuner.starts.count == starts + 1 && f.listening, "listening restarts from the first wake phrase")
     #expect(!f.canStartOver)
-}
-
-@MainActor @Test func theConfusablePromptNeverUsesTheUsersOwnName() {
-    let (f, _, _) = tuningFlow()
-    f.app.update { $0.rename("John") }
-    #expect(f.otherPrompts == ["Hey Sam", "John", "Hey there"])
 }
 
 // MARK: Setup button row
@@ -445,15 +440,15 @@ final class RecordingTuner: VoiceTuner {
         ("voice permission", QARender.flow(.voice, mic: .notDetermined)),
         ("voice permission denied", QARender.flow(.voice, mic: .denied)),
         ("voice start", QARender.flow(.voice)),
-        ("voice listening", QARender.flow(.voice, tweak: { $0.positives = [[0], [0]]; $0.listening = true; $0.tuningStarted = true })),
-        ("voice hint", QARender.flow(.voice, tweak: { $0.positives = [[0]]; $0.listening = true; $0.tuningStarted = true
-            $0.hint = "That sounded like \u{201C}Hey John\u{201D}, a different name. Say \u{201C}Hey Dot\u{201D}." })),
+        ("voice listening", QARender.flow(.voice, tweak: { $0.takes = [take("HEY DOT"), take("HEY DOT")]; $0.listening = true; $0.tuningStarted = true })),
+        ("voice hint", QARender.flow(.voice, tweak: { $0.takes = [take("HEY DOT")]; $0.listening = true; $0.tuningStarted = true
+            $0.hint = "That one sounded different from your others. Say it the way you usually do." })),
         ("voice no audio", QARender.flow(.voice, tweak: { $0.tuningStarted = true; $0.problem = .noAudio })),
         ("voice tuned", QARender.flow(.voice, tweak: { f in
-            f.positives = [[0], [0], [0], [0]]; f.negatives = [[0], [0], [0]]
+            f.takes = Array(repeating: take("HEY DOT"), count: 4)
             let t = Tuning(settings: WakeSettings(), caught: 4, falseHits: 0, note: "Caught 4 of 4, no false hits.")
             f.calibration = t
-            f.tuningSummary = OnboardingModel.summary(t, phrase: "Hey Dot", positives: 4, negatives: 3)
+            f.tuningSummary = OnboardingModel.summary(t, phrase: "Hey Dot", positives: 4)
         })),
         ("sign in", QARender.flow(.connect, signedIn: false, tweak: { $0.webSignedIn = false })),
         ("sign in, checking it's you", QARender.flow(.connect, signedIn: false, tweak: { $0.webSignedIn = false; $0.webChallenge = true })),

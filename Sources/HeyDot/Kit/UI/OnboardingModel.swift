@@ -59,9 +59,12 @@ final class OnboardingModel: ObservableObject {
     @Published var micStatus: AVAuthorizationStatus
 
     // Voice tuning: one screen, the mic stays open, utterances tick slots as they're heard.
-    static let phraseTarget = 4, otherTarget = 3
-    @Published var positives: [Clip] = []
-    @Published var negatives: [Clip] = []
+    static let phraseTarget = 4
+    /// Every plausible recording of the wake phrase, in order. The ones that sound alike are the positives;
+    /// a stray take stays here, unticked, until enough others agree without it.
+    @Published var takes: [Utterance] = []
+    var positives: [Clip] { agreeing.map { takes[$0].clip } }
+    private var agreeing: [Int] { Takes.agreeing(takes.map(\.heard)) }
     @Published var listening = false
     /// Tuning starts only when the user presses Start (not on entering the step).
     @Published var tuningStarted = false
@@ -128,14 +131,6 @@ final class OnboardingModel: ObservableObject {
         if let draft = phraseDraft, !draft.trimmingCharacters(in: .whitespaces).isEmpty { return Phrase.validateWakePhrase(draft) }
         let name = (try? Phrase.validateName(nameDraft).get()) ?? app.settings.dotName
         return Phrase.validateWakePhrase(Phrase.phrase(forName: name))
-    }
-    /// What tuning asks for after the wake phrase: the phrase's start with a different name (the confusable
-    /// that matters most), the name alone, and "Hey there".
-    var otherPrompts: [String] {
-        let words = app.settings.phrase.split(separator: " ").map(String.init)
-        let decoy = words.contains("john") ? "sam" : "john"
-        return [Phrase.title(([words.first ?? "hey"] + [decoy]).joined(separator: " ")),
-                Phrase.title(words.dropFirst().joined(separator: " ")), "Hey there"]
     }
 
     // MARK: Navigation
@@ -297,17 +292,15 @@ final class OnboardingModel: ObservableObject {
 
     // MARK: Voice tuning
 
-    enum TuneStage { case permission, phrase, others, ready }
+    enum TuneStage { case permission, phrase, ready }
     enum TuneProblem: Equatable { case noAudio, quiet }
 
     var stage: TuneStage {
         if micStatus != .authorized { return .permission }
-        if positives.count < Self.phraseTarget { return .phrase }
-        if negatives.count < Self.otherTarget && calibration == nil { return .others }
-        return .ready
+        return positives.count < Self.phraseTarget ? .phrase : .ready
     }
 
-    /// Enough was heard to tune: three of the four wake phrases (the other phrases help but are optional).
+    /// Enough was heard to tune: three of the four takes agree.
     var canSet: Bool { positives.count >= Self.phraseTarget - 1 && !calibrating && calibration == nil }
 
     /// Entering the step reads the permission and the device list; nothing listens until Start.
@@ -375,49 +368,46 @@ final class OnboardingModel: ObservableObject {
                           + (lastAudio == nil ? " (no buffers in 3 s)" : (digitalSilence ? " (only digital silence)" : " (buffers stopped)")))
             stopTuning()
             withAnimation(.easeOut(duration: 0.2)) { problem = .noAudio }
-        } else if !soundHeard && positives.isEmpty && negatives.isEmpty && t.timeIntervalSince(listenStart) >= 10, problem == nil {
+        } else if !soundHeard && takes.isEmpty && t.timeIntervalSince(listenStart) >= 10, problem == nil {
             withAnimation(.easeOut(duration: 0.2)) { problem = .quiet }
         }
     }
 
-    /// One utterance while tuning. A wake-phrase slot ticks only when the model heard the phrase; anything
-    /// else gets a truthful hint and no tick, so a confusable ("Hey John") is never counted as a success.
+    /// One utterance while tuning. On the wake phrase step a plausible recording is a take, and it ticks a slot
+    /// when it sounds like the user's other takes: HeyDot learns the way they say it, never a spelling of ours.
+    /// Hints describe the recording, not the name.
     func heard(_ u: Utterance) {
-        let say = "Say \u{201C}\(phraseTitle)\u{201D}"
         switch stage {
         case .phrase:
-            guard u.duration <= 4 else { hint = "That was a long one. \(say), then pause."; return }
-            switch u.hearing {
-            case .phrase:
-                hint = "Heard it."
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { positives.append(u.clip) }
-            case .otherName(let words):
-                hint = "That sounded like \u{201C}\(Phrase.title(words.lowercased()))\u{201D}, a different name. \(say)."
-            case .missingStart(let words):
-                hint = "Heard \u{201C}\(Phrase.title(words.lowercased()))\u{201D} without the start. \(say)."
-            case .nothing:
-                hint = "Didn\u{2019}t catch that. \(say) again."
-            }
-        case .others:
-            guard u.duration >= 0.3 else { return }
-            guard !u.matched else {
-                hint = "That was \u{201C}\(phraseTitle)\u{201D}. Now say \u{201C}\(otherPrompts[negatives.count])\u{201D}."
+            if let problem = Takes.problem(u, phrase: app.settings.phrase) {
+                hint = switch problem {
+                case .quiet: "That was too quiet to make out. Say it a little louder."
+                case .nothing: "Didn\u{2019}t catch anything. Say it again."
+                case .long: "That was longer than a wake phrase. Say just the phrase, then pause."
+                }
                 return
             }
-            hint = nil
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { negatives.append(u.clip) }
-            if negatives.count >= Self.otherTarget { stopTuning() }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                takes.append(u)
+                if takes.count > Self.takeLimit, let stray = takes.indices.first(where: { !agreeing.contains($0) }) { takes.remove(at: stray) }
+            }
+            hint = agreeing.contains(takes.count - 1) ? "Got it."
+                : "That one sounded different from your others. Say it the way you usually do."
+            if stage == .ready { stopTuning() }
         case .permission, .ready:
             break
         }
     }
 
+    /// Takes kept on the wake phrase step: the four that agree and a few strays.
+    static let takeLimit = 8
+
     func resetTuning() {
-        positives = []; negatives = []
+        takes = []
         calibration = nil; tuningSummary = nil; hint = nil; tuneError = nil
     }
 
-    var canStartOver: Bool { (!positives.isEmpty || !negatives.isEmpty) && !calibrating && micStatus == .authorized }
+    var canStartOver: Bool { !takes.isEmpty && !calibrating && micStatus == .authorized }
 
     /// Start over: clears every sample (and any result) and listens again from the first wake phrase.
     func startOver() {
@@ -425,16 +415,11 @@ final class OnboardingModel: ObservableObject {
         if step == .voice && micStatus == .authorized && tuningStarted { startTuning() }
     }
 
-    /// Retries one sample: removes that wake phrase (or other phrase) so the next utterance fills it again.
+    /// Retries one sample: removes that take so the next utterance fills its slot again.
     func retry(phrase index: Int) {
-        guard positives.indices.contains(index), !calibrating else { return }
-        positives.remove(at: index)
-        retried()
-    }
-
-    func retry(other index: Int) {
-        guard negatives.indices.contains(index), !calibrating else { return }
-        negatives.removeSubrange(index...)  // the prompts are asked in order
+        let agreeing = agreeing
+        guard agreeing.indices.contains(index), !calibrating else { return }
+        takes.remove(at: agreeing[index])
         retried()
     }
 
@@ -449,10 +434,10 @@ final class OnboardingModel: ObservableObject {
         calibrating = true
         defer { calibrating = false }
         do {
-            let result = try await app.enroller.calibrate(phrase: app.settings.phrase, positives: positives, negatives: negatives)
+            let result = try await app.enroller.calibrate(phrase: app.settings.phrase, positives: positives, negatives: [])
             let tuning = Tuning(result)
             calibration = tuning
-            tuningSummary = Self.summary(tuning, phrase: phraseTitle, positives: positives.count, negatives: negatives.count)
+            tuningSummary = Self.summary(tuning, phrase: phraseTitle, positives: positives.count)
             app.update { $0.wake = result.settings; $0.calibrationNote = result.note }
         } catch {
             tuneError = AppModel.describe(error)
@@ -460,13 +445,9 @@ final class OnboardingModel: ObservableObject {
     }
 
     /// The tuning result in plain words (the heading says whether it was perfect).
-    static func summary(_ t: Tuning, phrase: String, positives p: Int, negatives n: Int) -> String {
-        if t.caught == p && t.falseHits == 0 {
-            return n > 0 ? "HeyDot caught all \(p) of your \u{201C}\(phrase)\u{201D}s and ignored all \(n) other phrases."
-                         : "HeyDot caught all \(p) of your \u{201C}\(phrase)\u{201D}s."
-        }
-        let answered = n > 0 ? " and answered \(t.falseHits) of the \(n) other phrases" : ""
-        return "HeyDot caught \(t.caught) of your \(p) \u{201C}\(phrase)\u{201D}s\(answered). Try again somewhere quieter, or keep this."
+    static func summary(_ t: Tuning, phrase: String, positives p: Int) -> String {
+        t.caught == p ? "HeyDot caught all \(p) of your \u{201C}\(phrase)\u{201D}s."
+            : "HeyDot caught \(t.caught) of your \(p) \u{201C}\(phrase)\u{201D}s. Try again somewhere quieter, or keep this."
     }
 
     var tunedPerfectly: Bool { calibration.map { $0.caught == positives.count && $0.falseHits == 0 } ?? false }
