@@ -211,7 +211,9 @@ enum QARender {
             // Dot maker and settings
             let maker = CGSize(width: 900, height: 680)
             try both("dotmaker-default", size: maker) { DotMakerView(draft: .default, onSave: { _, _ in }, onCancel: {}) }
-            try both("dotmaker-custom", size: maker) { DotMakerView(draft: .default, showCustom: true, onSave: { _, _ in }, onCancel: {}) }
+            // The whole designer, unscrolled, down to the Custom avatar section.
+            let fullMaker = CGSize(width: 900, height: 1500)
+            try both("dotmaker-full", size: fullMaker) { DotMakerView(draft: .default, onSave: { _, _ in }, onCancel: {}) }
             // A real import of a sample avatar (validated and normalised like a user's), into a throwaway folder.
             let avatars = FileManager.default.temporaryDirectory.appendingPathComponent("heydot-qa-avatars-\(UUID().uuidString)")
             Avatars.directory = avatars
@@ -221,8 +223,8 @@ enum QARender {
             try Self.sampleAvatar.write(to: sample, atomically: true, encoding: .utf8)
             let imported = try Avatars.importFile(sample)
             let avatar = DotDesign(nickname: "Pip", custom: imported.art)
-            try both("dotmaker-imported-avatar", size: maker) {
-                DotMakerView(draft: avatar, menuBarIcon: .color, showCustom: true, onSave: { _, _ in }, onCancel: {})
+            try both("dotmaker-imported-avatar", size: fullMaker) {
+                DotMakerView(draft: avatar, menuBarIcon: .color, onSave: { _, _ in }, onCancel: {})
             }
             try both("popover-imported-avatar") { popover(model { $0.design = avatar; $0.menuBarIcon = .color }) }
             try DotBoards.write(GlyphStrip(extra: [avatar]), to: out("menubar-glyphs-with-avatar"), scale: 2)

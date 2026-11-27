@@ -35,5 +35,5 @@ must match the flat vector art style HeyDot's own dots use. Ask me what characte
 - Flat colours as `fill="#RRGGBB"` attributes.
 - Exactly one `<g id="eyes">` holding the eye shapes, with no groups nested inside it.
 
-When it's done, tell me the file's path. I'll import it in HeyDot: Design your dot > Custom avatar... >
+When it's done, tell me the file's path. I'll import it in HeyDot: Design your dot > Custom avatar >
 Import SVG or PNG. If you can render PNG previews at 16, 18 and 128 px, show me those too.

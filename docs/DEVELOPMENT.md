@@ -93,8 +93,7 @@ glasses style (`DIR/fit`, with one large sheet per option in `DIR/fit/rows`) plu
 18 pt glyph on a light and a dark bar. Monochrome (default) is a template image macOS tints; Color draws
 the dot's own colours for the bar's light or dark appearance, with an orange attention badge.
 
-**Custom (hidden):** a small **Custom avatar…** link under the dot maker's preview opens a Custom section
-(it opens by itself when the saved design is custom). It offers:
+**Custom avatar:** the dot maker's last section, below Accessory color (Nickname is the first). It offers:
 
 - **Import SVG or PNG.** SVGs must be self-contained shapes (`svg`, `g`, `path`, `circle`, `ellipse`,
   `rect`, `polygon`, `polyline`, `line`, `title`, `desc`; no scripts, styles, images, links, `url()`,

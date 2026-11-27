@@ -2,13 +2,11 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// "Design your dot": the same categories, labels and order as ChatGPT's dot designer, drawn in our style.
-/// A small "Custom avatar…" link under the preview reveals the Custom section (import, design with your
-/// agent, the example flat vector); it stays hidden otherwise.
+/// "Design your dot": ChatGPT's dot designer categories and labels, drawn in our style, with the nickname
+/// first and the Custom avatar section (import, design with your agent) last.
 struct DotMakerView: View {
     @State var draft: DotDesign
     @State var menuBarIcon: MenuBarIcon = .monochrome
-    @State var showCustom = false
     var onSave: (DotDesign, MenuBarIcon) -> Void
     var onCancel: () -> Void
 
@@ -28,43 +26,38 @@ struct DotMakerView: View {
                 .background(Color.primary.opacity(0.03))
             Divider()
             VStack(spacing: 0) {
-                ScrollViewReader { scroll in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 22) {
-                            if showCustom { custom.id("custom") }
-                            group("Shape") {
-                                grid(ShapeChoice.all, selected: ShapeChoice(draft), label: \.label) { $0.applied(to: draft) }
-                                    apply: { draft = $0.applied(to: draft) }
-                            }
-                            group("Color") { swatches(DotColor.faceColors, selected: draft.color) { draft.color = $0 } }
-                            group("Eyes") {
-                                grid(DotEyes.allCases, selected: draft.eyes, label: \.label) { e in var d = draft; d.eyes = e; d.custom = nil; return d }
-                                    apply: { draft.eyes = $0; draft.custom = nil }
-                            }
-                            group("Glasses") {
-                                grid(DotGlasses.allCases, selected: draft.glasses, label: \.label) { g in var d = draft; d.glasses = g; d.custom = nil; return d }
-                                    apply: { draft.glasses = $0; draft.custom = nil }
-                            }
-                            group("Accessories") {
-                                grid(DotAccessory.allCases, selected: draft.accessory, label: \.label) { a in var d = draft; d.accessory = a; d.custom = nil; return d }
-                                    apply: { draft.accessory = $0; draft.custom = nil }
-                            }
-                            group("Accessory color") {
-                                swatches(DotColor.accessoryColors, selected: draft.accessoryColor) { draft.accessoryColor = $0 }
-                                    .disabled(draft.accessory == .none)
-                                    .opacity(draft.accessory == .none ? 0.4 : 1)
-                            }
-                            group("Nickname") {
-                                TextField("Nickname", text: $draft.nickname, prompt: Text("Your dot"))
-                                    .modifier(FrostField())
-                                    .frame(maxWidth: 280)
-                            }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        group("Nickname") {
+                            TextField("Nickname", text: $draft.nickname, prompt: Text("Your dot"))
+                                .modifier(FrostField())
+                                .frame(maxWidth: 280)
                         }
-                        .padding(24)
+                        group("Shape") {
+                            grid(ShapeChoice.all, selected: ShapeChoice(draft), label: \.label) { $0.applied(to: draft) }
+                                apply: { draft = $0.applied(to: draft) }
+                        }
+                        group("Color") { swatches(DotColor.faceColors, selected: draft.color) { draft.color = $0 } }
+                        group("Eyes") {
+                            grid(DotEyes.allCases, selected: draft.eyes, label: \.label) { e in var d = draft; d.eyes = e; d.custom = nil; return d }
+                                apply: { draft.eyes = $0; draft.custom = nil }
+                        }
+                        group("Glasses") {
+                            grid(DotGlasses.allCases, selected: draft.glasses, label: \.label) { g in var d = draft; d.glasses = g; d.custom = nil; return d }
+                                apply: { draft.glasses = $0; draft.custom = nil }
+                        }
+                        group("Accessories") {
+                            grid(DotAccessory.allCases, selected: draft.accessory, label: \.label) { a in var d = draft; d.accessory = a; d.custom = nil; return d }
+                                apply: { draft.accessory = $0; draft.custom = nil }
+                        }
+                        group("Accessory color") {
+                            swatches(DotColor.accessoryColors, selected: draft.accessoryColor) { draft.accessoryColor = $0 }
+                                .disabled(draft.accessory == .none)
+                                .opacity(draft.accessory == .none ? 0.4 : 1)
+                        }
+                        group("Custom avatar") { custom }
                     }
-                    .onChange(of: showCustom) { _, shown in
-                        if shown { withAnimation { scroll.scrollTo("custom", anchor: .top) } }
-                    }
+                    .padding(24)
                 }
                 Divider()
                 HStack(spacing: Frost.Space.m) {
@@ -79,10 +72,6 @@ struct DotMakerView: View {
         .frame(minWidth: 860, minHeight: 620)
         .background(FrostBackdrop(animated: false).ignoresSafeArea())
         .frostAccent(draft)
-        .onAppear {
-            // A saved avatar or custom avatar opens with its section showing, so it can be changed back.
-            if draft.custom != nil { showCustom = true }
-        }
     }
 
     var preview: some View {
@@ -105,13 +94,6 @@ struct DotMakerView: View {
             }
             MenuBarIconPicker(design: draft, selection: $menuBarIcon)
             Spacer()
-            if !showCustom {
-                Button("Custom avatar\u{2026}") { showCustom = true }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .font(.caption.weight(.medium))
-                    .help("Import your own avatar, design one with your coding agent.")
-                    .padding(.bottom, 14)
-            }
         }
         .padding(.horizontal, 20)
     }
@@ -119,18 +101,13 @@ struct DotMakerView: View {
     // MARK: Custom
 
     var custom: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Custom").font(.headline)
-                Spacer()
-                Button("Hide") { showCustom = false }.frostButton(.chip)
-            }
+        VStack(alignment: .leading, spacing: Frost.Space.l) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Your own avatar").font(.subheadline.weight(.semibold))
                 Text("An SVG or PNG, roughly square. A transparent background lets the monochrome menu bar use its shape.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: Frost.Space.s) {
-                    Button("Import SVG or PNG\u{2026}", action: importAvatar).frostButton(.chip)
+                    Button(action: importAvatar) { Label("Import SVG or PNG\u{2026}", systemImage: "square.and.arrow.down") }
+                        .frostButton(.chip)
                     if draft.custom != nil {
                         Button("Remove", role: .destructive) { draft.custom = nil; importNotes = []; importError = nil }.frostButton(.chip)
                     }
@@ -158,7 +135,6 @@ struct DotMakerView: View {
                 }
                 if showPrompt { FrostCodePreview(text: Self.avatarPrompt) }
             }
-            Divider()
         }
     }
 
@@ -287,15 +263,18 @@ struct OptionCell: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                DotView(design)
-                    .padding(10)
-                    .frame(width: 72, height: 72)
-                    .background(Color(hex: 0xF3F2EE), in: RoundedRectangle(cornerRadius: Frost.Radius.field, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Frost.Radius.field, style: .continuous)
-                            .strokeBorder(selected ? env.frostMark : (hover ? Color.primary.opacity(0.25) : Color.primary.opacity(0.06)),
-                                          lineWidth: selected ? 2.5 : 1)
-                    )
+                Group {
+                    // The logo is its own PNG artwork, as on the preview tile; every other design is drawn.
+                    if design.isLogo { DotTile(design, size: 72) } else { DotView(design).padding(10) }
+                }
+                .frame(width: 72, height: 72)
+                .background(Color(hex: 0xF3F2EE))
+                .clipShape(RoundedRectangle(cornerRadius: Frost.Radius.field, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Frost.Radius.field, style: .continuous)
+                        .strokeBorder(selected ? env.frostMark : (hover ? Color.primary.opacity(0.25) : Color.primary.opacity(0.06)),
+                                      lineWidth: selected ? 2.5 : 1)
+                )
                 Text(label)
                     .font(.caption)
                     .multilineTextAlignment(.center)
