@@ -113,3 +113,15 @@ private func previouslyAuthorizedProfileListensAtLaunch() {
     #expect(microphone.engine.isListening)
     #expect(microphone.requests == 0)
 }
+
+@MainActor @Test func microphoneChoiceReachesTheListenerAndPersists() throws {
+    let home = try shortTempDir()
+    defer { try? FileManager.default.removeItem(at: home) }
+    let (model, engine) = readyModel(home: home)
+    #expect(engine.startedOn == [nil])  // built-in by default
+    model.update { $0.inputDeviceUID = "AppleUSBAudioEngine:Mic" }
+    #expect(engine.startedOn == [nil, "AppleUSBAudioEngine:Mic"])  // takes effect at once
+    #expect(try SettingsStore(url: Paths(home: home).settings).load().inputDeviceUID == "AppleUSBAudioEngine:Mic")
+    model.update { $0.inputDeviceUID = nil }
+    #expect(engine.startedOn.last == .some(nil))
+}
