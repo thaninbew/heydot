@@ -6,6 +6,23 @@
     <description>HeyDot's update feed, read by Sparkle in the app. Each release adds one signed item; see docs/DEVELOPMENT.md.</description>
     <language>en</language>
     <item>
+      <title>Version 0.2.7</title>
+      <sparkle:version>2.7</sparkle:version>
+      <sparkle:shortVersionString>0.2.7</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<h3>Name your dot anything</h3>
+<ul>
+<li><b>Any name, any wake phrase.</b> HeyDot no longer refuses names or phrases like Jarvis or Siri.</li>
+<li><b>Checks for updates at launch</b> and asks before installing. Turn automatic checks off in Settings &gt; General.</li>
+<li><b>Voice tuning that listens to you.</b> Say the phrase four times, your way. If you tuned before 0.2.5, run Settings &gt; Voice tuning again.</li>
+<li><b>No pause needed</b> between "hey" and the name, plus a tidier dot designer and steadier setup.</li>
+</ul>
+]]></description>
+      <pubDate>Fri, 27 Nov 2026 23:28:53 +0000</pubDate>
+      <enclosure url="https://github.com/thaninbew/heydot/releases/download/v0.2.7/HeyDot-0.2.7.zip" sparkle:edSignature="S91wo1lX29OQq6iIWpHjYX0OVjOdlz7MxaG7HULW1YVb2s0mcYx6uARLMF0qv24CWoPmsOCDtZw63PzxbT5XDA==" length="13857155" type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Version 0.2.6</title>
       <sparkle:version>2.6</sparkle:version>
       <sparkle:shortVersionString>0.2.6</sparkle:shortVersionString>
