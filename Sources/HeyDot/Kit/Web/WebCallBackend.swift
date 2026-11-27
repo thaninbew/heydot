@@ -33,7 +33,7 @@ public protocol WebCalling: AnyObject {
     /// Loads the dot page in the hidden view so a wake only has to press.
     func warm(dotURL: String?)
     func pageState() async -> WebPageState
-    func showSignIn(onClose: @escaping () -> Void)
+    func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void)
     func signOut() async
     func prepareForErase() async
     /// Drops the hidden page and anything still waiting on it (a hung press, a stale page), so the next
@@ -62,7 +62,7 @@ public final class NoWeb: WebCalling {
     public func endCall() {}
     public func warm(dotURL: String?) {}
     public func pageState() async -> WebPageState { state }
-    public func showSignIn(onClose: @escaping () -> Void) {}
+    public func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {}
     public func signOut() async {}
 }
 
@@ -88,7 +88,8 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     private var signInWindow: NSWindow?
     private var signInView: WKWebView?
     let signInState = SignInState()
-    private var signInClosed: (() -> Void)?
+    private var signInClosed: ((DotTab?) -> Void)?
+    static let dotDirectory = URL(string: "https://chatgpt.com/dots")!
     private var popups: [NSWindow] = []
     private var loadError: String?
     private var placing = false
@@ -399,7 +400,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         let view: WKWebView
         if let signInView, signInWindow?.isVisible == true { view = signInView } else {
             view = ensureView()
-            if view.url == nil { load(URL(string: "https://chatgpt.com/")!) }
+            if view.url == nil { load(Self.dotDirectory) }
             let deadline = Date().addingTimeInterval(10)
             while view.isLoading && Date() < deadline && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(200)) }
         }
@@ -407,18 +408,25 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         let r = await run(PageScripts.state, in: view)
         guard r["ready"] as? Bool == true else { return WebPageState(signedIn: nil) }
         let dots = (r["dots"] as? [[String: Any]] ?? []).compactMap { d -> DotTab? in
-            guard let url = d["url"] as? String else { return nil }
-            return DotTab(url: url, title: d["title"] as? String ?? url)
+            guard let value = d["url"] as? String else { return nil }
+            return DotTab.conversation(at: URL(string: value), title: d["title"] as? String)
         }
         return WebPageState(signedIn: r["signedIn"] as? Bool, challenge: r["challenge"] as? Bool ?? false, dots: dots)
     }
 
     /// A normal visible window on chatgpt.com, sharing the persistent store. The user signs in however
     /// chatgpt.com offers (Google, Apple, email, phone). WebKit's own user agent is left unchanged.
-    public func showSignIn(onClose: @escaping () -> Void) {
+    public func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {
         guard !erasing else { return }
         signInClosed = onClose
+        let enteringPicker = pickingDot && !signInState.pickingDot
+        signInState.pickingDot = pickingDot
+        let title = pickingDot ? "Pick your dot" : "Sign in to ChatGPT"
         if let signInWindow {
+            signInWindow.title = title
+            if enteringPicker, DotTab.conversation(at: signInView?.url, title: nil) == nil {
+                signInView?.load(URLRequest(url: Self.dotDirectory))
+            }
             NSApp.activate(ignoringOtherApps: true)
             signInWindow.makeKeyAndOrderFront(nil)
             return
@@ -431,7 +439,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         let window = NSWindow(contentViewController: NSHostingController(rootView: SignInView(web: view, state: signInState, done: { [weak self] in
             self?.signInWindow?.close()
         }).fontDesign(.rounded)))
-        window.title = "Sign in to ChatGPT"
+        window.title = title
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         window.setContentSize(NSSize(width: 980, height: 760))
         window.isReleasedWhenClosed = false
@@ -439,7 +447,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         window.center()
         signInWindow = window
         signInView = view
-        view.load(URLRequest(url: URL(string: "https://chatgpt.com/")!))
+        view.load(URLRequest(url: pickingDot ? Self.dotDirectory : URL(string: "https://chatgpt.com/")!))
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         // Typing and Return go to the page's sign-in form, not to the window's buttons.
@@ -449,6 +457,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
 
     public func windowWillClose(_ notification: Notification) {
         guard (notification.object as? NSWindow) === signInWindow else { return }
+        let picker = signInState.pickingDot ? signInView : nil
         signInView?.stopLoading()
         signInWindow = nil; signInView = nil
         popups.forEach { $0.close() }; popups = []
@@ -460,7 +469,18 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         if let url = webView?.url, !inCall { load(url) }
         let closed = signInClosed
         signInClosed = nil
-        closed?()
+        guard let picker, let selected = DotTab.conversation(at: picker.url, title: picker.title) else {
+            closed?(nil)
+            return
+        }
+        Task {
+            let state = await run(PageScripts.state, in: picker)
+            guard !erasing, signInWindow == nil else { return }
+            let path = state["path"] as? String
+            let confirmed = state["ready"] as? Bool == true && state["signedIn"] as? Bool == true
+                && path.map(Self.trim) == URL(string: selected.url)?.path
+            closed?(confirmed ? selected : nil)
+        }
     }
 
     public func signOut() async {
@@ -657,6 +677,7 @@ final class Once {
 /// page that failed to load).
 @MainActor
 final class SignInState: ObservableObject {
+    @Published var pickingDot = false
     @Published var trouble = false
     /// The page in this window asked for the microphone (someone pressed call here), which this window never gets.
     @Published var callAttempted = false
@@ -674,8 +695,8 @@ struct SignInView: View {
                 Image(systemName: "person.crop.circle.badge.checkmark").font(.title2).foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Sign in to ChatGPT").font(.headline)
-                    Text("Use Google, Apple, email or phone. HeyDot has no servers. You sign in to ChatGPT itself; your session stays on this Mac.")
+                    Text(state.pickingDot ? "Pick your dot" : "Sign in to ChatGPT").font(.headline)
+                    Text(state.pickingDot ? "Open your dot, then click Done to use its link." : "Use Google, Apple, email or phone. HeyDot has no servers. You sign in to ChatGPT itself; your session stays on this Mac.")
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)

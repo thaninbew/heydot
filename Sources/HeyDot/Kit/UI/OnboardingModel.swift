@@ -92,7 +92,11 @@ final class OnboardingModel: ObservableObject {
     private var webTimer: Timer?
     private var webReading = false
 
-    @Published var urlDraft: String
+    private enum LinkSource { case manual, discovered, selected }
+    private var linkSource: LinkSource = .manual
+    @Published var urlDraft: String {
+        didSet { linkSource = .manual }
+    }
     @Published var urlError: String?
     @Published var checkResult: CallResult?
     @Published var checking = false
@@ -487,7 +491,18 @@ final class OnboardingModel: ObservableObject {
 
     // MARK: Built-in browser
 
-    func signIn() { app.showSignIn() }
+    func signIn() { openChatGPT(pickingDot: false) }
+
+    func openChatGPT(pickingDot: Bool) {
+        app.web.showChatGPT(pickingDot: pickingDot) { [weak self] selected in
+            guard let self else { return }
+            if let selected {
+                if !webDots.contains(where: { $0.url == selected.url }) { webDots.append(selected) }
+                pick(selected)
+            }
+            Task { await self.readWeb() }
+        }
+    }
 
     func startWatchingWeb() {
         stopWatchingWeb()
@@ -506,8 +521,19 @@ final class OnboardingModel: ObservableObject {
         let state = await app.refreshWebState()
         if let signedIn = state.signedIn { webSignedIn = signedIn }
         webChallenge = state.challenge
+        if state.signedIn == false {
+            webDots.removeAll()
+            if linkSource != .manual { urlDraft = "" }
+            checkResult = nil
+            return
+        }
+        guard state.signedIn == true else { return }
         for dot in state.dots where !webDots.contains(where: { $0.url == dot.url }) { webDots.append(dot) }
-        if urlDraft.isEmpty, let first = webDots.first { urlDraft = first.url }
+        if linkSource == .discovered && webDots.count != 1 { urlDraft = "" }
+        if urlDraft.isEmpty, webDots.count == 1, let only = webDots.first {
+            urlDraft = only.url
+            linkSource = .discovered
+        }
     }
 
     // MARK: Pick dot
@@ -527,6 +553,7 @@ final class OnboardingModel: ObservableObject {
 
     func pick(_ tab: DotTab) {
         urlDraft = tab.url
+        linkSource = .selected
         checkResult = nil
     }
 

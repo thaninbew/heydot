@@ -354,7 +354,7 @@ public final class AppModel: ObservableObject {
     }
 
     public func showSignIn() {
-        web.showSignIn { [weak self] in Task { await self?.refreshWebState() } }
+        web.showChatGPT(pickingDot: false) { [weak self] _ in Task { await self?.refreshWebState() } }
     }
 
     public func endCall() { web.endCall() }

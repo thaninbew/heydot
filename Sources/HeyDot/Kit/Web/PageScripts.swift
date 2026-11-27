@@ -63,7 +63,7 @@ enum PageScripts {
         || [...document.querySelectorAll("button, a")].some((b) => /^(log in|sign up|sign up for free)$/i.test(labelOf(b)));
     const dots = new Map();
     const add = (u, title) => {
-      if (u.host !== "chatgpt.com" || !/^\\/dots\\/[^/]+/.test(u.pathname)) return;
+      if (!onChatGPT || loggedOut || challenge || u.origin !== "https://chatgpt.com" || !/^\\/dots\\/[^/]+/.test(u.pathname)) return;
       const key = "https://chatgpt.com" + u.pathname.replace(/\\/+$/, "");
       const name = (title || "").trim().split("\\n")[0].slice(0, 60);
       if (!dots.has(key) || (!dots.get(key) && name)) dots.set(key, name);

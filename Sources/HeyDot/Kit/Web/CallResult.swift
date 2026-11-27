@@ -36,7 +36,16 @@ public struct DotTab: Sendable, Equatable, Identifiable {
     public let title: String
     public var id: String { url }
     public init(url: String, title: String) { self.url = url; self.title = title }
-    /// A dot's own conversation page lives under /dots on chatgpt.com.
-    public var isDot: Bool { URL(string: url)?.path.hasPrefix("/dots") ?? false }
+    static func conversation(at url: URL?, title: String?) -> DotTab? {
+        guard let url, url.scheme == "https", url.host == "chatgpt.com", url.port == nil,
+              url.user == nil, url.password == nil, url.pathComponents.count == 3,
+              url.pathComponents[1] == "dots",
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        components.query = nil
+        components.fragment = nil
+        if components.percentEncodedPath.hasSuffix("/") { components.percentEncodedPath.removeLast() }
+        guard let link = components.url else { return nil }
+        let label = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return DotTab(url: link.absoluteString, title: label.isEmpty ? url.lastPathComponent : label)
+    }
 }
-

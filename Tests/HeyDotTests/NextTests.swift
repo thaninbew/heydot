@@ -97,7 +97,7 @@ private func tempDir() throws -> URL {
     func endCall() { inCall = false; onCallChange?(nil) }
     func warm(dotURL: String?) {}
     func pageState() async -> WebPageState { WebPageState(signedIn: true) }
-    func showSignIn(onClose: @escaping () -> Void) {}
+    func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {}
     func signOut() async {}
 }
 
@@ -212,7 +212,7 @@ private func tempDir() throws -> URL {
     func endCall() {}
     func warm(dotURL: String?) {}
     func pageState() async -> WebPageState { WebPageState(signedIn: signedIn) }
-    func showSignIn(onClose: @escaping () -> Void) {}
+    func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {}
     func signOut() async {}
     func reset() { resets += 1 }
 }
@@ -309,4 +309,40 @@ private func tempDir() throws -> URL {
     try Data([1, 2, 3]).write(to: WebCryptoKey.url(paths))   // a damaged key is replaced, not used
     let second = try #require(WebCryptoKey.load(paths: paths))
     #expect(second.count == 16 && second != first)
+}
+
+@MainActor @Test func signedInDiscoveryFillsOneLinkAndLeavesSeveralForTheUser() async {
+    let web = NoWeb()
+    let model = QARender.model({ $0.dotURL = nil }, web: web)
+    let first = DotTab(url: "https://chatgpt.com/dots/one", title: "One")
+    let second = DotTab(url: "https://chatgpt.com/dots/two", title: "Two")
+    let picker = OnboardingModel(app: model)
+    web.state = WebPageState(signedIn: true, dots: [first, second])
+    await picker.readWeb()
+    #expect(picker.webDots == [first, second])
+    #expect(picker.urlDraft.isEmpty)
+    web.state = WebPageState(signedIn: true, dots: [first])
+    let single = OnboardingModel(app: model)
+    await single.readWeb()
+    #expect(single.urlDraft == first.url)
+    web.state = WebPageState(signedIn: true, dots: [first, second])
+    await single.readWeb()
+    #expect(single.urlDraft.isEmpty)
+    single.pick(second)
+    await single.readWeb()
+    #expect(single.urlDraft == second.url)
+    web.state = WebPageState(signedIn: false)
+    await single.readWeb()
+    #expect(single.webDots.isEmpty && single.urlDraft.isEmpty)
+    single.urlDraft = first.url
+    await single.readWeb()
+    #expect(single.urlDraft == first.url)
+}
+
+@Test func browserSelectionRequiresASpecificChatGPTDot() {
+    let result = DotTab.conversation(at: URL(string: "https://chatgpt.com/dots/one/?src=test#top"), title: "One")
+    #expect(result == DotTab(url: "https://chatgpt.com/dots/one", title: "One"))
+    for raw in ["https://chatgpt.com/dots", "https://chatgpt.com/c/other", "https://example.com/dots/one"] {
+        #expect(DotTab.conversation(at: URL(string: raw), title: nil) == nil)
+    }
 }

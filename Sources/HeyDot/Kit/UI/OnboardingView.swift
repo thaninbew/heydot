@@ -457,7 +457,7 @@ struct OnboardingView: View {
         return FrostCard {
             VStack(alignment: .leading, spacing: 10) {
                 if list.isEmpty {
-                    Text("Open your dot in ChatGPT and it shows up here, or paste its link.")
+                    Text("Open your dot to fill in its link automatically, or paste a link below.")
                         .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 36)
                 } else {
                     ScrollView {
@@ -465,6 +465,7 @@ struct OnboardingView: View {
                     }
                     .frame(height: min(132, CGFloat(list.count) * 44))
                 }
+                Button("Open ChatGPT…") { flow.openChatGPT(pickingDot: true) }.frostButton(.chip)
                 HStack(spacing: 8) {
                     TextField("Link", text: $flow.urlDraft, prompt: Text("https://chatgpt.com/\u{2026}"))
                         .modifier(FrostField(height: Frost.chipHeight + 2, fontSize: 13))

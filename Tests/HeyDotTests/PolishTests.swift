@@ -45,7 +45,7 @@ private func tempDir() throws -> URL {
     func endCall() { inCall = false }
     func warm(dotURL: String?) {}
     func pageState() async -> WebPageState { WebPageState(signedIn: true) }
-    func showSignIn(onClose: @escaping () -> Void) {}
+    func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {}
     func signOut() async {}
 }
 
