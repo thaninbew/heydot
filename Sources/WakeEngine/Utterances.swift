@@ -14,6 +14,7 @@ public struct UtteranceSegmenter: Sendable {
     private var pending: Clip = []
     private var preroll: [Clip] = []
     private var current: Clip = []
+    private var openingSamples = 0
     private var inSpeech = false
     private var streak = 0
     private var silent = 0
@@ -52,6 +53,7 @@ public struct UtteranceSegmenter: Sendable {
             if streak >= Self.startFrames {
                 inSpeech = true; silent = 0
                 current = preroll.flatMap { $0 }
+                openingSamples = current.count
                 preroll.removeAll()
             }
             return nil
@@ -69,8 +71,8 @@ public struct UtteranceSegmenter: Sendable {
         var clip = current
         clip.removeLast(min(trailing, clip.count))
         current = []; silent = 0
-        let voicedSamples = clip.count - Self.prerollFrames * Self.frame
-        return voicedSamples >= Self.rate / 4 ? clip : nil
+        // The first utterance may start before the pre-roll fills.
+        return clip.count - openingSamples >= Self.rate / 4 ? clip : nil
     }
 }
 

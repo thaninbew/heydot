@@ -11,3 +11,4 @@ WAV payloads total < 600 KB. No microphone, network, or OS speech synthesis used
 The Tray and Luminaropolis fixtures were regenerated from the neutral example phrases on 2026-11-17 with the command above.
 The rare-name regression enrolls at 150, 165 and 195 words/minute and holds out 170; the public corpus uses distinct enrollment and held-out utterances without changing the matcher or assertions.
 The rare-spelling test uses Lumynaropolis as the target spelling for the spoken synthetic Luminaropolis to preserve coverage of learned tokens differing from spelled tokens.
+hey-dot-Daniel-320.wav uses the same command at 320 words/minute to test a short tuning attempt at the start of capture.
