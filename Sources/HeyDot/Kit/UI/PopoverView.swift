@@ -226,7 +226,7 @@ struct PopoverView: View {
     }
 
     func chip(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Text(title).lineLimit(1).fixedSize().padding(.horizontal, 3) }
+        Button(action: action) { Text(title).lineLimit(1).fixedSize() }
             .frostButton(.chip)
     }
 

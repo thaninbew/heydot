@@ -406,3 +406,80 @@ final class RecordingTuner: VoiceTuner {
     f.app.update { $0.rename("John") }
     #expect(f.otherPrompts == ["Hey Sam", "John", "Hey there"])
 }
+
+// MARK: Setup button row
+
+/// The 46 pt buttons (Back, Later, the primary) of a setup screen, read from its accessibility tree, in window points
+/// from the top left.
+@MainActor private func setupRowButtons(_ view: OnboardingView) -> [(label: String, frame: CGRect)] {
+    _ = NSApplication.shared
+    // SwiftUI builds its accessibility tree only once an assistive client asks for it.
+    NSApp.setValue(true, forKey: "accessibilityEnhancedUserInterface")
+    let host = NSHostingView(rootView: view.environment(\.frostSnapshot, true))
+    let window = KeyWindow(contentRect: NSRect(x: -4000, y: -4000, width: 760, height: 600), styleMask: [.borderless],
+                           backing: .buffered, defer: false)
+    window.contentView = host
+    window.makeKeyAndOrderFront(nil)
+    host.layoutSubtreeIfNeeded()
+    _ = host.accessibilityChildren()
+    RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+    defer { window.orderOut(nil) }
+    func walk(_ element: Any) -> [(String, CGRect)] {
+        guard let node = element as? NSObject, let screen = (node.value(forKey: "accessibilityFrame") as? NSValue)?.rectValue else { return [] }
+        let frame = CGRect(x: screen.minX - window.frame.minX, y: window.frame.maxY - screen.maxY, width: screen.width, height: screen.height)
+        let isPill = node.value(forKey: "accessibilityRole") as? String == NSAccessibility.Role.button.rawValue
+            && abs(frame.height - Frost.pillHeight) < 0.5
+        let here = isPill ? [(node.value(forKey: "accessibilityLabel") as? String ?? "", frame)] : []
+        return here + (node.value(forKey: "accessibilityChildren") as? [Any] ?? []).flatMap(walk)
+    }
+    return walk(host)
+}
+
+@MainActor @Test func setupButtonRowStaysPutOnEveryStepAndState() {
+    let url = "https://chatgpt.com/dots/sol"
+    let screens: [(String, OnboardingView)] = [
+        ("welcome", QARender.flow(.welcome)),
+        ("name", QARender.flow(.name)),
+        ("name with a problem", QARender.flow(.name, tweak: { $0.nameDraft = "Tray"; $0.editPhrase(); $0.phraseDraft = "Hey Siri" })),
+        ("name, design later", QARender.flow(.name, tweak: { $0.designDeferred = true })),
+        ("voice permission", QARender.flow(.voice, mic: .notDetermined)),
+        ("voice permission denied", QARender.flow(.voice, mic: .denied)),
+        ("voice start", QARender.flow(.voice)),
+        ("voice listening", QARender.flow(.voice, tweak: { $0.positives = [[0], [0]]; $0.listening = true; $0.tuningStarted = true })),
+        ("voice hint", QARender.flow(.voice, tweak: { $0.positives = [[0]]; $0.listening = true; $0.tuningStarted = true
+            $0.hint = "That sounded like \u{201C}Hey John\u{201D}, a different name. Say \u{201C}Hey Dot\u{201D}." })),
+        ("voice no audio", QARender.flow(.voice, tweak: { $0.tuningStarted = true; $0.problem = .noAudio })),
+        ("voice tuned", QARender.flow(.voice, tweak: { f in
+            f.positives = [[0], [0], [0], [0]]; f.negatives = [[0], [0], [0]]
+            let t = Tuning(settings: WakeSettings(), caught: 4, falseHits: 0, note: "Caught 4 of 4, no false hits.")
+            f.calibration = t
+            f.tuningSummary = OnboardingModel.summary(t, phrase: "Hey Dot", positives: 4, negatives: 3)
+        })),
+        ("sign in", QARender.flow(.connect, signedIn: false, tweak: { $0.webSignedIn = false })),
+        ("sign in, checking it's you", QARender.flow(.connect, signedIn: false, tweak: { $0.webSignedIn = false; $0.webChallenge = true })),
+        ("pick a dot", QARender.flow(.connect, tweak: { f in
+            f.webSignedIn = true
+            f.webDots = [DotTab(url: url, title: "Sol"), DotTab(url: "https://chatgpt.com/dots/tray", title: "Tray")]
+            f.urlDraft = url
+            f.checkResult = CallResult(outcome: "would-press")
+        })),
+        ("done", QARender.flow(.done, settings: { $0.dotURL = url })),
+        ("done, call result", QARender.flow(.done, settings: { $0.dotURL = url }, tweak: { $0.testResult = CallResult(outcome: "pressed") })),
+        ("done, design later", QARender.flow(.done, settings: { $0.dotURL = url }, tweak: { $0.designDeferred = true })),
+    ]
+    var rowTop: CGFloat?
+    for (name, view) in screens {
+        let buttons = setupRowButtons(view)
+        #expect(!buttons.isEmpty, "\(name): has a button row")
+        guard let first = buttons.first else { continue }
+        let row = buttons.dropFirst().reduce(first.frame) { $0.union($1.frame) }
+        // The row sits at one height on every screen, centred, each pill one height, the wide ones at least 132 wide.
+        #expect(abs(row.minY - (rowTop ?? row.minY)) < 0.5, "\(name): row top \(row.minY), first screen \(rowTop ?? 0)")
+        rowTop = rowTop ?? row.minY
+        #expect(abs(row.midX - 380) < 0.5, "\(name): row centred (mid \(row.midX))")
+        for button in buttons where button.label != "Back" {
+            #expect(button.frame.width >= FrostButtonStyle.baseWidth, "\(name): \(button.label) is \(button.frame.width) wide")
+        }
+        if let back = buttons.first(where: { $0.label == "Back" }) { #expect(back.frame.size == CGSize(width: 46, height: 46)) }
+    }
+}

@@ -21,22 +21,16 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            FrostBackdrop().ignoresSafeArea()
-            // Scrolls only when a step is taller than the window (a long check result, larger text sizes).
-            GeometryReader { geo in
-                ScrollView {
-                    content
-                        .padding(.horizontal, 56)
-                        .padding(.top, 34)
-                        .padding(.bottom, 26)
-                        .frame(maxWidth: .infinity, minHeight: geo.size.height)
-                }
-                .scrollBounceBehavior(.basedOnSize)
-            }
-            if flow.step != .welcome { progress.padding(.top, 13) }
+        SetupStepLayout(back: showsBack ? { flow.back() } : nil) {
+            if flow.step != .welcome { progress }
+        } content: {
+            stepContent
+        } note: {
+            stepNote
+        } buttons: {
+            stepButtons
         }
-        .frame(width: 760, height: 600)
+        .background { FrostBackdrop().ignoresSafeArea() }
         .frostAccent(app.settings.design)
         // Back from System Settings: show the permission as it is now, never as assumed.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in flow.refreshMicrophone() }
@@ -57,7 +51,11 @@ struct OnboardingView: View {
         .accessibilityLabel("Step \(here + 1) of \(steps.count): \(flow.step.title)")
     }
 
-    @ViewBuilder var content: some View {
+    // MARK: Steps
+
+    // Each step supplies only its content, the note above the buttons and its buttons; `SetupStepLayout` places them.
+
+    @ViewBuilder var stepContent: some View {
         switch flow.step {
         case .welcome: welcome
         case .name: nameStep
@@ -66,6 +64,42 @@ struct OnboardingView: View {
         case .done: done
         }
     }
+
+    @ViewBuilder var stepNote: some View {
+        switch flow.step {
+        case .welcome: EmptyView()
+        case .name:
+            if let problem = nameProblem { note(problem, problem: true) }
+            else { laterHint("Change either one later in Settings.") }
+        case .voice:
+            if flow.returnAfterTuning, let error = app.settingsError { note(error, problem: true) }
+            else if flow.calibration == nil && flow.stage != .permission {
+                laterHint("Later uses standard settings. Tune any time in Settings > Voice tuning.")
+            }
+        case .connect:
+            if flow.webSignedIn != true && flow.webChallenge {
+                note("chatgpt.com is checking it\u{2019}s you. Finish that in the sign-in window.", problem: true)
+            }
+        case .done:
+            laterHint("Change any of this later in Settings.")
+            if let error = app.settingsError ?? flow.loginError { note(error, problem: true) }
+        }
+    }
+
+    @ViewBuilder var stepButtons: some View {
+        switch flow.step {
+        case .welcome: primaryButton("Get started", action: flow.primary)
+        case .name: primaryButton("Continue", enabled: flow.canContinue, action: flow.primary)
+        case .voice: voiceActions
+        case .connect:
+            if flow.webSignedIn == true { primaryButton("Continue", enabled: flow.canContinue, action: flow.primary) }
+            else { primaryButton("Sign in", action: flow.signIn) }
+        case .done: doneActions
+        }
+    }
+
+    /// Back goes to the step before, except from the first and last steps and when tuning was opened from Settings.
+    var showsBack: Bool { flow.step != .welcome && flow.step != .done && flow.canGoBack && !flow.returnAfterTuning }
 
     // MARK: Shared pieces
 
@@ -79,18 +113,6 @@ struct OnboardingView: View {
             }
         }
         .frame(maxWidth: 560)
-    }
-
-    /// The centred button row: Back (round), then the step's buttons.
-    func actions<C: View>(back: Bool = true, @ViewBuilder _ buttons: () -> C) -> some View {
-        HStack(spacing: 12) {
-            if back && flow.canGoBack && !flow.returnAfterTuning {
-                Button(action: flow.back) { Image(systemName: "chevron.left").font(.system(size: 15, weight: .semibold)) }
-                    .frostButton(.round)
-                    .accessibilityLabel("Back")
-            }
-            buttons()
-        }
     }
 
     func primaryButton(_ title: String, busy: Bool = false, enabled: Bool = true, action: @escaping () -> Void) -> some View {
@@ -148,15 +170,9 @@ struct OnboardingView: View {
 
     var welcome: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
             FloatingTile(design: .default, size: 164)
             heading("Say \u{201C}Hey Dot.\u{201D}\nYour dot picks up.", "Listening stays on this Mac.", size: 40)
                 .padding(.top, 40)
-            actions(back: false) {
-                primaryButton("Get started", action: flow.primary)
-            }
-            .padding(.top, 22)
-            Spacer(minLength: 0)
         }
     }
 
@@ -175,7 +191,6 @@ struct OnboardingView: View {
 
     var nameStep: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
             FloatingTile(design: app.settings.design, size: 100)
             Group {
                 if flow.designDeferred {
@@ -221,14 +236,6 @@ struct OnboardingView: View {
                 .frame(width: 236)
             }
             .padding(.top, 22)
-            Group {
-                if let problem = nameProblem { note(problem, problem: true) }
-                else { laterHint("Change either one later in Settings.") }
-            }
-            .frame(height: 20).padding(.top, 10)
-            actions { primaryButton("Continue", enabled: flow.canContinue, action: flow.primary) }
-                .padding(.top, 8)
-            Spacer(minLength: 0)
         }
     }
 
@@ -260,7 +267,6 @@ struct OnboardingView: View {
 
     var voice: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
             ZStack {
                 LiveRings(history: flow.levels, size: 92, active: flow.listening)
                 FloatingTile(design: app.settings.design, size: 92)
@@ -283,14 +289,6 @@ struct OnboardingView: View {
                 Button("Start over", action: flow.startOver).frostButton(.chip)
                     .help("Clear every sample and tune again").padding(.top, 14)
             }
-            if flow.calibration == nil && flow.stage != .permission {
-                laterHint("Later uses standard settings. Tune any time in Settings > Voice tuning.").padding(.top, 14)
-            }
-            voiceActions.padding(.top, 12)
-            if flow.returnAfterTuning, let error = app.settingsError {
-                note(error, problem: true).padding(.top, 10)
-            }
-            Spacer(minLength: 0)
         }
     }
 
@@ -316,25 +314,19 @@ struct OnboardingView: View {
     /// Required: the microphone (no Later). Then Start, Try again after a miss, and Continue once enough was heard.
     @ViewBuilder var voiceActions: some View {
         if flow.calibration == nil && flow.stage == .permission {
-            actions {
-                if flow.micStatus == .denied || flow.micStatus == .restricted {
-                    primaryButton("Open Privacy Settings", action: flow.openPrivacySettings)
-                } else {
-                    primaryButton("Enable microphone", action: flow.requestMicrophone)
-                        .disabled(app.requestingMicrophoneAccess)
-                }
+            if flow.micStatus == .denied || flow.micStatus == .restricted {
+                primaryButton("Open Privacy Settings", action: flow.openPrivacySettings)
+            } else {
+                primaryButton("Enable microphone", action: flow.requestMicrophone)
+                    .disabled(app.requestingMicrophoneAccess)
             }
         } else if flow.calibration == nil && (!flow.tuningStarted || flow.problem == .noAudio) {
-            actions {
-                laterButton(flow.skipTuning)
-                primaryButton(flow.tuningStarted ? "Try again" : "Start", action: flow.startListening)
-            }
+            laterButton(flow.skipTuning)
+            primaryButton(flow.tuningStarted ? "Try again" : "Start", action: flow.startListening)
         } else {
-            actions {
-                if flow.calibration == nil { laterButton(flow.skipTuning).disabled(flow.calibrating) }
-                primaryButton(flow.calibrating ? "Tuning\u{2026}" : (flow.calibration != nil && flow.returnAfterTuning ? "Done" : "Continue"),
-                              busy: flow.calibrating, enabled: flow.canContinue && !flow.calibrating, action: flow.primary)
-            }
+            if flow.calibration == nil { laterButton(flow.skipTuning).disabled(flow.calibrating) }
+            primaryButton(flow.calibrating ? "Tuning\u{2026}" : (flow.calibration != nil && flow.returnAfterTuning ? "Done" : "Continue"),
+                          busy: flow.calibrating, enabled: flow.canContinue && !flow.calibrating, action: flow.primary)
         }
     }
 
@@ -427,27 +419,18 @@ struct OnboardingView: View {
 
     var signIn: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
             FloatingTile(design: app.settings.design, size: 96)
             heading("Sign in to ChatGPT").padding(.top, 30)
             builtInNote.padding(.top, 12)
-            if flow.webChallenge { note("chatgpt.com is checking it\u{2019}s you. Finish that in the sign-in window.", problem: true).padding(.top, 8) }
-            actions { primaryButton("Sign in", action: flow.signIn) }
-                .padding(.top, 24)
-            Spacer(minLength: 0)
         }
     }
 
     var pickDot: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
             heading("Pick your dot")
             Label("Signed in. Nothing goes through HeyDot servers.", systemImage: "lock")
                 .font(.system(size: 15)).foregroundStyle(.secondary).padding(.top, 10)
             dotList.padding(.top, 20)
-            actions { primaryButton("Continue", enabled: flow.canContinue, action: flow.primary) }
-                .padding(.top, 12)
-            Spacer(minLength: 0)
         }
     }
 
@@ -511,7 +494,6 @@ struct OnboardingView: View {
 
     var done: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
             ZStack {
                 TileRings(size: 112)
                 FloatingTile(design: app.settings.design, size: 112)
@@ -532,16 +514,6 @@ struct OnboardingView: View {
                 }
             }
             .padding(.top, 16)
-            actions(back: false) {
-                Button { Task { await flow.realTestCall() } } label: {
-                    Label(flow.testCalling ? "Calling\u{2026}" : "Try a call", systemImage: "phone")
-                }
-                .frostButton(.secondary)
-                .disabled(flow.testCalling || app.settings.dotURL == nil)
-                .help("Presses your dot's call button once.")
-                primaryButton(app.settingsError == nil ? "Done" : "Try Again", action: flow.primary)
-            }
-            .padding(.top, 20)
             HStack(spacing: 18) {
                 Toggle("Open at login", isOn: $flow.launchAtLogin).toggleStyle(.switch).controlSize(.small)
                 if flow.designDeferred {
@@ -551,21 +523,73 @@ struct OnboardingView: View {
             }
             .font(.callout).foregroundStyle(.secondary)
             .padding(.top, 20)
-            laterHint("Change any of this later in Settings.").padding(.top, 8)
-            Group {
-                if let error = app.settingsError ?? flow.loginError { note(error, problem: true) }
-                else if let result = flow.testResult { ResultBanner(result: result).frame(width: 380) }
+            if app.settingsError == nil && flow.loginError == nil, let result = flow.testResult {
+                ResultBanner(result: result).frame(width: 380).padding(.top, 16)
             }
-            .padding(.top, 10)
-            Spacer(minLength: 0)
         }
+    }
+
+    @ViewBuilder var doneActions: some View {
+        Button { Task { await flow.realTestCall() } } label: {
+            Label(flow.testCalling ? "Calling\u{2026}" : "Try a call", systemImage: "phone")
+        }
+        .frostButton(.secondary)
+        .disabled(flow.testCalling || app.settings.dotURL == nil)
+        .help("Presses your dot's call button once.")
+        primaryButton(app.settingsError == nil ? "Done" : "Try Again", action: flow.primary)
     }
 }
 
-/// Icon and title close together, for short lists.
-private struct TightLabel: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 6) { configuration.icon.imageScale(.small); configuration.title }
+/// The one layout every setup step uses. The page dots sit fixed at the top, the step's content is centred in the
+/// space between, its note (a hint or a problem) sits above the buttons, and the button row (Back, then the step's
+/// buttons, centred) is pinned the same distance from the bottom on every step. Notes and content that change
+/// height grow away from the row, so moving between steps, or within one, never moves it.
+struct SetupStepLayout<Dots: View, Content: View, Note: View, Buttons: View>: View {
+    /// Nil hides Back (the first and last steps, and tuning opened from Settings).
+    let back: (() -> Void)?
+    let dots: Dots
+    let content: Content
+    let note: Note
+    let buttons: Buttons
+
+    init(back: (() -> Void)?, @ViewBuilder dots: () -> Dots, @ViewBuilder content: () -> Content,
+         @ViewBuilder note: () -> Note, @ViewBuilder buttons: () -> Buttons) {
+        self.back = back
+        self.dots = dots(); self.content = content(); self.note = note(); self.buttons = buttons()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            dots
+                .padding(.top, 13)
+                .frame(maxWidth: .infinity, minHeight: 34, maxHeight: 34, alignment: .top)
+            // Scrolls only when a step is taller than its space (a long check result, larger text sizes).
+            GeometryReader { geo in
+                ScrollView {
+                    content
+                        .padding(.horizontal, 56)
+                        .frame(maxWidth: .infinity, minHeight: geo.size.height)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            VStack(spacing: Frost.Space.m) {
+                note
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 560, minHeight: 20, alignment: .bottom)
+                HStack(spacing: Frost.Space.m) {
+                    if let back {
+                        Button(action: back) { Image(systemName: "chevron.left").font(.system(size: 15, weight: .semibold)) }
+                            .frostButton(.round)
+                            .accessibilityLabel("Back")
+                    }
+                    buttons
+                }
+                .frame(height: Frost.pillHeight)
+            }
+            .padding(.top, Frost.Space.m)
+            .padding(.bottom, Frost.Space.xxl)
+        }
+        .frame(width: 760, height: 600)
     }
 }
 
