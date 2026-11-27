@@ -85,7 +85,7 @@ import WebKit
     f.step = .name
     f.nameDraft = "Tray"; f.editPhrase()
     #expect(f.phraseDraft == "Hey Tray")
-    f.phraseDraft = "Hey Siri"
+    f.phraseDraft = "Tray"  // one word: a wake phrase needs two to six
     #expect(!f.canContinue)
     f.phraseDraft = "Okay Tray"
     f.calibration = Tuning(settings: WakeSettings(), caught: 4, falseHits: 0, note: "old")

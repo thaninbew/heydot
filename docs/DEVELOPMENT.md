@@ -42,8 +42,7 @@ Tests: `Tests/HeyDotTests` has one file per behavior (`OnboardingTests`, `CallTe
 
 - **Listening:** the `WakeEngine` target spots the wake phrase on device (sherpa-onnx keyword model): `hey <name>`
   by default, or the user's own phrase (`AppSettings.wakePhrase`, 2 to 6 words of a to z that the model's
-  tokenizer encodes; words or phrases of other assistants such as "jarvis", "siri", "alexa" or "ok google" are
-  refused). Changing it resets tuning and re-runs voice tuning.
+  tokenizer encodes; any words are allowed). Changing it resets tuning and re-runs voice tuning.
 - **Which microphone:** the built-in microphone, unless the user picks another in Settings > Microphone (or on
   the tuning screen), remembered by its Core Audio UID. HeyDot never follows the macOS default input and never
   changes it, so Bluetooth headphones or an iPhone's Continuity microphone are used only when deliberately
@@ -257,7 +256,7 @@ To test persistent WebKit, use a separate bundle ID and a fresh `HEYDOT_WEBKIT_S
 
 ## First run
 
-Guided: welcome, name your dot (default "Dot"; 1 to 3 words; "jarvis" is reserved; **Design your dot** and **Later**
+Guided: welcome, name your dot (default "Dot"; 1 to 3 words, any name; **Design your dot** and **Later**
 chips sit under the tile; Name and Wake word are separate fields, the wake word on **Auto** ("Hey <Name>") until
 typed in; both changeable in Settings), voice tuning, connect ChatGPT, done. **Later** leaves the Design your dot
 chip there and adds one on the last step (and the popover's palette icon). Tuning has **Later**
