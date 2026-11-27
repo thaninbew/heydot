@@ -20,8 +20,6 @@ public struct UtteranceSegmenter: Sendable {
     private var silent = 0
     /// True once any frame has crossed the speech gate (the "did the mic hear anything" signal).
     public private(set) var heardSound = false
-    /// True while a segment is open.
-    public var speaking: Bool { inSpeech }
 
     public init() {}
 

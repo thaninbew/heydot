@@ -1,5 +1,3 @@
-import AppKit
-import QuartzCore
 import SwiftUI
 
 // Frost: HeyDot's window and popover look. A see-through window the wallpaper tints, two soft tint blobs drifting
@@ -33,16 +31,13 @@ enum Frost {
 private struct FrostAccentKey: EnvironmentKey { static let defaultValue = Accent.ui(Accent.defaultHex) }
 
 extension EnvironmentValues {
-    /// The dot-derived accent (`Accent`) as sRGB hex, set at each window's root.
+    /// The accent fill (`Theme.accent`) as sRGB hex, set at each window's root by `frostTheme`.
     var frostAccentHex: UInt32 {
         get { self[FrostAccentKey.self] }
         set { self[FrostAccentKey.self] = newValue }
     }
-    var frostAccent: Color { Color(hex: frostAccentHex) }
     /// `Accent.mark` for the current appearance.
     var frostMark: Color { Color(hex: Accent.mark(frostAccentHex, dark: colorScheme == .dark)) }
-    /// The label colour on an accent fill (`Accent.label`).
-    var frostLabel: Color { Color(hex: Accent.label(on: frostAccentHex)) }
 }
 
 /// `frostMark` as a style, resolved where it's drawn. Good news (signed in, call started, a check passed) uses the
@@ -55,9 +50,9 @@ extension ShapeStyle where Self == FrostMarkStyle {
 }
 
 extension View {
-    /// Sets the accent for this subtree from a dot design: glass tint, focus rings, progress, rings, switches, links.
-    /// Since round 6 the whole theme follows the dot (`Theme`), not only the accent.
-    func frostAccent(_ design: DotDesign) -> some View { frostTheme(Theme.forDesign(design)) }
+    /// Themes this subtree from a dot design (`Theme.forDesign`): backdrop, accent, glass tint, focus rings,
+    /// progress, rings, switches and links.
+    func frostTheme(_ design: DotDesign) -> some View { frostTheme(Theme.forDesign(design)) }
 }
 
 private struct FrostSnapshotKey: EnvironmentKey { static let defaultValue = false }

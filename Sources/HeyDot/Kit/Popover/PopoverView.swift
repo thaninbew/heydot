@@ -44,7 +44,7 @@ struct PopoverView: View {
         .padding(16)
         .frame(width: 300)
         .background(FrostBackdrop(animated: false, material: false).ignoresSafeArea())
-        .frostAccent(model.settings.design)
+        .frostTheme(model.settings.design)
         .animation(.easeOut(duration: 0.2), value: model.lastResult)
     }
 
@@ -293,14 +293,10 @@ struct PopoverView: View {
             .foregroundStyle(showsRecovery ? Color.primary : Color.secondary)
             .help("Checks the microphone, the wake phrase, your ChatGPT sign-in and the call button, and helps fix what's wrong.")
             Spacer()
-            iconButton("paintpalette", "Design your dot", action: openDotMaker)
-            iconButton("gearshape", "Settings", action: openSettings).keyboardShortcut(",", modifiers: .command)
-            iconButton("power", "Quit HeyDot", action: quit).keyboardShortcut("q", modifiers: .command)
+            IconButton(symbol: "paintpalette", title: "Design your dot", action: openDotMaker)
+            IconButton(symbol: "gearshape", title: "Settings", action: openSettings).keyboardShortcut(",", modifiers: .command)
+            IconButton(symbol: "power", title: "Quit HeyDot", action: quit).keyboardShortcut("q", modifiers: .command)
         }
-    }
-
-    func iconButton(_ symbol: String, _ title: String, action: @escaping () -> Void) -> some View {
-        IconButton(symbol: symbol, title: title, action: action)
     }
 }
 

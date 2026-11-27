@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Five small bars that follow the listener's input level (-60 dBFS flat, -6 dBFS full).
-/// The one input-level meter (popover, Not working?): five bars that sit as equal dots in silence and rise into a
-/// centred peak with the voice.
+/// The one input-level meter (popover, Not working?): five bars that sit as equal dots in silence (-60 dBFS) and
+/// rise into a centred peak with the voice (full at -6 dBFS).
 struct LevelBars: View {
     var level: Float
     @Environment(\.self) private var env

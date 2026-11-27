@@ -185,7 +185,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     public func call(dotURL: String, wakeAt: Date) async -> CallResult {
         guard !erasing else { return CallResult(outcome: "cancelled") }
         guard let target = URL(string: dotURL), target.host == "chatgpt.com" else { return CallResult(outcome: "no-dot") }
-        guard !inCall, !placing else { return CallResult(outcome: "disabled", message: Self.describe("in-call")) }
+        guard !inCall, !placing else { return CallResult(outcome: "disabled", message: CallResult.describe("in-call")) }
         placing = true; micWasOn = false
         idleUnload?.cancel(); idleUnload = nil
         let mine = epoch
@@ -212,7 +212,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
                 try? await Task.sleep(for: .seconds(20))
                 guard let self, !Task.isCancelled, self.inCall, !self.micWasOn else { return }
                 self.log.write("web: microphone never opened after the press; ending")
-                self.finishCall(problem: Self.describe("no-mic"))
+                self.finishCall(problem: CallResult.describe("no-mic"))
             }
         } else {
             conceal()
@@ -223,13 +223,13 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
             "wake_to_press_ms": .array([["step": "web", "start": .number(Double(ms(began))), "end": .number(Double(ms(end)))]]),
         ]
         log.write("wake: " + (String(data: (try? event.data()) ?? Data(), encoding: .utf8) ?? outcome))
-        return CallResult(outcome: outcome, message: Self.describe(outcome), wakeToPressMs: ms(end))
+        return CallResult(outcome: outcome, wakeToPressMs: ms(end))
     }
 
     public func check(dotURL: String) async -> CallResult {
         guard !erasing else { return CallResult(outcome: "cancelled") }
         guard let target = URL(string: dotURL), target.host == "chatgpt.com" else { return CallResult(outcome: "no-dot") }
-        if inCall || placing { return CallResult(outcome: "disabled", message: Self.describe("in-call")) }
+        if inCall || placing { return CallResult(outcome: "disabled", message: CallResult.describe("in-call")) }
         pageReaders += 1
         defer { pageReaders -= 1; scheduleIdleUnload() }
         let view = ensureView()
@@ -237,7 +237,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         if reloaded { load(target) }
         let outcome = await press(target, view: view, click: false, within: reloaded ? 20 : 8)
         log.write("check: built-in \(outcome)")
-        return CallResult(outcome: outcome, message: Self.describe(outcome))
+        return CallResult(outcome: outcome)
     }
 
     /// Polls `PageScripts.press` until it settles. Terminal at once: pressed, would-press, challenge,
@@ -533,7 +533,7 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
     public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         guard webView === self.webView else { return }
         log.write("web: page process ended")
-        if inCall { finishCall(problem: Self.describe("crashed")) }
+        if inCall { finishCall(problem: CallResult.describe("crashed")) }
         else { loadError = "Web content process terminated"; discardIdleView() }
     }
 
@@ -576,28 +576,6 @@ public final class WebCallBackend: NSObject, WebCalling, WKNavigationDelegate, W
         popups.removeAll { window in
             guard window.contentView === webView else { return false }
             window.close(); return true
-        }
-    }
-
-    // MARK: Messages
-
-    static func describe(_ outcome: String) -> String {
-        switch outcome {
-        case "pressed": "Call started."
-        case "would-press": "Ready. HeyDot found your dot's call button and left it alone."
-        case "signed-out": "HeyDot isn't signed in to ChatGPT. Sign in again from Settings."
-        case "challenge": "chatgpt.com wants to check it's you. Open the sign-in window from Settings and finish it there."
-        case "not-found": "Couldn't find the call button on your dot's page. Nothing was pressed."
-        case "wrong-dot": "Your dot's page didn't open (it went somewhere else). Check the dot link in Settings."
-        case "ambiguous": "More than one call button is showing, so HeyDot didn't press anything."
-        case "disabled": "The call button is off, probably because a call is already running."
-        case "in-call": "A call is already running."
-        case "hidden": "macOS didn't let HeyDot's call window become active in time. Nothing was pressed."
-        case "load-failed": "Couldn't load your dot's page. Check the internet connection."
-        case "timeout": "Your dot's page didn't finish loading in time. Nothing was pressed."
-        case "no-mic": "The call started but the microphone never opened, so HeyDot ended it."
-        case "crashed": "The ChatGPT page stopped, so the call ended."
-        default: "Something went wrong, so nothing was pressed."
         }
     }
 }

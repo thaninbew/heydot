@@ -31,7 +31,7 @@ struct OnboardingView: View {
             stepButtons
         }
         .background { FrostBackdrop().ignoresSafeArea() }
-        .frostAccent(app.settings.design)
+        .frostTheme(app.settings.design)
         // Back from System Settings: show the permission as it is now, never as assumed.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in flow.refreshMicrophone() }
     }
@@ -45,7 +45,7 @@ struct OnboardingView: View {
                     .frame(width: step == flow.step ? 20 : 6, height: 6)
             }
         }
-        .frostAccent(app.settings.design)
+        .frostTheme(app.settings.design)
         .animation(.easeOut(duration: 0.2), value: flow.step)
         .accessibilityElement()
         .accessibilityLabel("Step \(here + 1) of \(steps.count): \(flow.step.title)")
@@ -144,8 +144,6 @@ struct OnboardingView: View {
         Text(text).font(.footnote).foregroundStyle(.tertiary).multilineTextAlignment(.center)
     }
 
-    static let noServers = "HeyDot has no servers. Your session stays on this Mac."
-
     // MARK: Microphone access
 
     /// The permission as macOS reports it now: allowed, a button that asks, or a link to the Microphone pane.
@@ -215,7 +213,7 @@ struct OnboardingView: View {
                 field("Wake word") {
                     ZStack(alignment: .trailing) {
                         TextField("Wake word", text: Binding(get: { flow.phraseDraft ?? "" },
-                                                            set: { flow.phraseDraft = $0.isEmpty ? nil : $0; flow.editingPhrase = !$0.isEmpty }),
+                                                            set: { flow.phraseDraft = $0.isEmpty ? nil : $0 }),
                                   prompt: Text(autoPhrase))
                             .modifier(FrostField())
                             .onSubmit { if flow.canContinue { flow.next() } }

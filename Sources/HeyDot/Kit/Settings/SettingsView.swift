@@ -171,7 +171,7 @@ struct SettingsView: View {
         // screen with nothing to scroll, leaving everything below the fold unreachable.
         .frame(width: 560)
         .frame(minHeight: SettingsView.minimumHeight, idealHeight: 680, maxHeight: .infinity)
-        .frostAccent(model.settings.design)
+        .frostTheme(model.settings.design)
         .alert("Erase HeyDot's local data?", isPresented: $confirmingErase) {
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
             Button("Erase and Start Over", role: .destructive) {

@@ -1,8 +1,8 @@
 import Foundation
 import WakeEngine
 
-/// Name and wake phrase rules, matching dots_voice_wake/config.py: a dot name is 1 to 3 plain words,
-/// the phrase is "hey <name>", and no word may collide with another assistant's wake word.
+/// Name and wake phrase rules: a dot name is 1 to 3 plain words, the phrase is "hey <name>" unless the user
+/// sets one, and no word may collide with another assistant's wake word.
 public enum Phrase {
     public static let defaultName = "Dot"
     public static let reservedWords: Set<String> = ["jarvis"]
@@ -101,7 +101,7 @@ public enum Phrase {
         phrase.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
 
-    /// A dot's conversation URL must be on https://chatgpt.com/ (config.py rule).
+    /// A dot's conversation URL must be on https://chatgpt.com/.
     public static func validateDotURL(_ raw: String) -> Result<String, URLProblem> {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard value.hasPrefix("https://chatgpt.com/"), let url = URL(string: value), url.host == "chatgpt.com",
@@ -113,4 +113,9 @@ public enum Phrase {
         case notChatGPT
         public var message: String { "Paste your dot's conversation link. It starts with https://chatgpt.com/." }
     }
+}
+
+extension Result {
+    /// Whether a validation passed.
+    var isSuccess: Bool { if case .success = self { return true }; return false }
 }

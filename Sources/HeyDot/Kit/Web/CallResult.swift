@@ -1,6 +1,6 @@
 import Foundation
 
-/// What a press attempt meant, in words for the popover. Mirrors adapters.PRESS_FAILURES.
+/// What a press or check attempt meant (`outcome`, from `PageScripts.press` or the backend), in words for the UI.
 public struct CallResult: Sendable, Equatable {
     public let outcome: String
     public let message: String
@@ -9,18 +9,26 @@ public struct CallResult: Sendable, Equatable {
     public var pressed: Bool { outcome == "pressed" }
     public var wouldPress: Bool { outcome == "would-press" }
 
+    /// The one message table for call outcomes, plus the backend's own reasons a call ended (`in-call`,
+    /// `no-mic`, `crashed`).
     public static func describe(_ outcome: String) -> String {
         switch outcome {
-        case "pressed": return "Call started."
-        case "would-press": return "Ready. HeyDot found your dot's call button and left it alone."
-        case "not-found": return "Couldn't find the call button. Open your dot in ChatGPT once and try again."
-        case "ambiguous": return "More than one call button is showing, so HeyDot didn't press anything."
-        case "wrong-dot": return "That tab shows a different conversation. Nothing was pressed."
-        case "disabled": return "The call button is off, probably because a call is already running."
-        case "challenge": return "chatgpt.com is showing a check. Open ChatGPT and finish it."
-        case "timeout": return "The page didn't answer in time. Nothing was pressed."
-        case "no-dot": return "Pick your dot's conversation first."
-        default: return "Something went wrong, so nothing was pressed."
+        case "pressed": "Call started."
+        case "would-press": "Ready. HeyDot found your dot's call button and left it alone."
+        case "signed-out": "HeyDot isn't signed in to ChatGPT. Sign in again from Settings."
+        case "challenge": "chatgpt.com wants to check it's you. Open the sign-in window from Settings and finish it there."
+        case "not-found": "Couldn't find the call button on your dot's page. Nothing was pressed."
+        case "wrong-dot": "Your dot's page didn't open (it went somewhere else). Check the dot link in Settings."
+        case "ambiguous": "More than one call button is showing, so HeyDot didn't press anything."
+        case "disabled": "The call button is off, probably because a call is already running."
+        case "in-call": "A call is already running."
+        case "hidden": "macOS didn't let HeyDot's call window become active in time. Nothing was pressed."
+        case "load-failed": "Couldn't load your dot's page. Check the internet connection."
+        case "timeout": "Your dot's page didn't finish loading in time. Nothing was pressed."
+        case "no-mic": "The call started but the microphone never opened, so HeyDot ended it."
+        case "crashed": "The ChatGPT page stopped, so the call ended."
+        case "no-dot": "Pick your dot's conversation first."
+        default: "Something went wrong, so nothing was pressed."
         }
     }
 

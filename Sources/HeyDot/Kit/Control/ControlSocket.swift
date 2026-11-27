@@ -78,7 +78,7 @@ public enum ControlSocket {
         /// Binds the socket, replacing a stale one. `directory` is created or tightened to 0700.
         public init(socket: URL) throws {
             path = socket.path
-            // Like Python's default: a peer that hangs up yields EPIPE, never a process-killing signal.
+            // A peer that hangs up yields EPIPE, never a process-killing SIGPIPE.
             signal(SIGPIPE, SIG_IGN)
             try Paths.ensureDirectory(socket.deletingLastPathComponent(), mode: 0o700)
             unlink(path)

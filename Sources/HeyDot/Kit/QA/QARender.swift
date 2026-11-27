@@ -120,7 +120,7 @@ enum QARender {
             let inCall = NoWeb(); inCall.inCall = true; inCall.microphoneMuted = false
             try both("popover-in-call") { popover(model(web: inCall)) }
             try both("popover-call-failed") {
-                let failed = model(); failed.setFixture(result: CallResult(outcome: "not-found", message: WebCallBackend.describe("not-found")), signedIn: true); return popover(failed)
+                let failed = model(); failed.setFixture(result: CallResult(outcome: "not-found"), signedIn: true); return popover(failed)
             }
 
             // Not working?: running, stopped at each kind of problem, and all clear.
@@ -140,7 +140,7 @@ enum QARender {
             try doctor("troubleshoot-call-button", [.microphoneAccess: .ok("HeyDot can use the microphone."),
                 .listening: .ok("Listening on \(mic)."), .hearing: .ok("Sound is reaching HeyDot from \(mic)."),
                 .phrase: .ok("Heard \u{201C}Hey Tray\u{201D}."), .signIn: .ok("Signed in to ChatGPT."),
-                .callButton: .problem(.callButton, WebCallBackend.describe("not-found"))])
+                .callButton: .problem(.callButton, CallResult.describe("not-found"))])
             try doctor("troubleshoot-done", Dictionary(uniqueKeysWithValues: Troubleshooter.Step.allCases.map { ($0, .ok("Fine.")) }))
 
             // Onboarding: every step and the tuning screen's states.

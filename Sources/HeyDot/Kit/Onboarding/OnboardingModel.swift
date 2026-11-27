@@ -53,7 +53,6 @@ final class OnboardingModel: ObservableObject {
     @Published var nameError: String?
     /// The wake phrase field on the naming step; nil while it follows the name ("Hey <Name>").
     @Published var phraseDraft: String?
-    @Published var editingPhrase = false
     /// "Later" on the design pill: the pill shrinks to a plain Design your dot button (still there, and on Done).
     @Published var designDeferred = false
     @Published var micStatus: AVAuthorizationStatus
@@ -134,8 +133,6 @@ final class OnboardingModel: ObservableObject {
     }
 
     // MARK: Navigation
-
-    var dotPicked: Bool { app.settings.dotURL != nil }
 
     var canContinue: Bool {
         switch step {
@@ -254,21 +251,18 @@ final class OnboardingModel: ObservableObject {
             return false
         case (_, .failure(let problem)):
             nameError = problem.message
-            editingPhrase = true
             return false
         }
     }
 
-    /// "Change" next to the wake phrase: starts from the phrase shown.
+    /// Starts a custom wake phrase from the one shown (QA renders and tests; typing in the field does the same).
     func editPhrase() {
         if phraseDraft == nil { phraseDraft = (try? phraseResult.get()).map(Phrase.title) ?? "" }
-        editingPhrase = true
     }
 
     /// Back to "Hey <Name>".
     func followName() {
         phraseDraft = nil
-        editingPhrase = false
     }
 
     // MARK: Microphone
@@ -566,10 +560,6 @@ final class OnboardingModel: ObservableObject {
         testResult = await app.placeCall()
         testCalling = false
     }
-}
-
-extension Result {
-    var isSuccess: Bool { if case .success = self { return true }; return false }
 }
 
 /// Recent input levels for the tuning waveform, newest last. Its own object so 20 updates a second

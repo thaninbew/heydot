@@ -33,7 +33,7 @@ public final class Log: @unchecked Sendable {
         defer { try? handle.close() }
         // Owner-only, including logs created 0644 by earlier builds.
         fchmod(handle.fileDescriptor, 0o600)
-        // App and native-host instances share this inode. Keep rotation under the same advisory lock.
+        // The app and its command-line instances share this file. Keep rotation under the same advisory lock.
         guard flock(handle.fileDescriptor, LOCK_EX | LOCK_NB) == 0 else { return }
         defer { flock(handle.fileDescriptor, LOCK_UN) }
         do {
@@ -48,6 +48,6 @@ public final class Log: @unchecked Sendable {
                 try handle.seek(toOffset: 0)
             }
             try handle.write(contentsOf: data)
-        } catch { /* Logging must never interrupt the call or native protocol. */ }
+        } catch { /* Logging must never interrupt a call or a control request. */ }
     }
 }

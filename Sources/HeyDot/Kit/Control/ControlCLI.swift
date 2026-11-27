@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: The command line
-
 public enum ControlCLI {
     /// Handles `--control …` and `--control-ssh`; nil for any other launch (the menu bar app).
     public static func run(arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment,

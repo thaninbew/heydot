@@ -2,8 +2,6 @@ import AppKit
 import QuartzCore
 import SwiftUI
 
-// MARK: Backdrop
-
 /// The window's background. Live: the behind-window material plus drifting tint blobs (window only; the popover
 /// passes `animated: false` and `material: false`, since NSPopover has its own material).
 struct FrostBackdrop: View {

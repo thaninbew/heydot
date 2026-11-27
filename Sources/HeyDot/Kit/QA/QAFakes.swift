@@ -19,7 +19,6 @@ final class FakeTuner: VoiceTuner {
 }
 
 struct FakeEnroller: WakeEnrolling {
-    func record(seconds: Double) async throws -> Clip { Array(repeating: 0.2, count: 16000) }
     // QA fixtures set the tuning result directly; `Calibration` has no public initializer to fake.
     func calibrate(phrase: String, positives: [Clip], negatives: [Clip]) async throws -> Calibration {
         throw WakeEngineError.engine("QA fake does not calibrate")

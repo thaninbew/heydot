@@ -71,7 +71,7 @@ struct DotMakerView: View {
         }
         .frame(minWidth: 860, minHeight: 620)
         .background(FrostBackdrop(animated: false).ignoresSafeArea())
-        .frostAccent(draft)
+        .frostTheme(draft)
     }
 
     var preview: some View {

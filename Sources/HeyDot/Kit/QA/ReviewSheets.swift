@@ -39,7 +39,7 @@ struct AccentBoard: View {
                     Button("Continue") {}.frostButton(.primary)
                     TileRings(size: 14, level: -20).frame(width: 30, height: 30)
                 }
-                .frostAccent(design)
+                .frostTheme(design)
             }
         }
         .padding(20)

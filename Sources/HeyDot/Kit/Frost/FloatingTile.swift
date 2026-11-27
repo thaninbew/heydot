@@ -2,8 +2,6 @@ import AppKit
 import QuartzCore
 import SwiftUI
 
-// MARK: Floating tile
-
 /// The app tile, floating 9 pt with a ±1.2° sway on a 6 s loop. The tile is drawn by `DotTile` exactly as
 /// everywhere else, rendered once into a layer, and only that layer moves.
 struct FloatingTile: View {

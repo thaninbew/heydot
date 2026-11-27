@@ -1,7 +1,6 @@
 import Foundation
 
-// Contract between the engine and the app. The engine workstream implements it; the app codes against
-// it (with a fake until the real engine lands). Change it only by agreement with both owners.
+// Everything the app uses from WakeEngine: settings, events, errors and the listening and tuning protocols.
 
 /// What to listen for. `phrase` is lowercase words, e.g. "hey tray" (default "hey dot").
 /// `spellings` are extra written forms of the same phrase that sound alike ("hey tray"); all map to one wake.
@@ -56,10 +55,8 @@ public protocol WakeListening: AnyObject {
     @MainActor var isListening: Bool { get }
 }
 
-/// Onboarding: record short clips, then pick settings that catch this person's own voice.
+/// Voice tuning: pick settings that catch this person's own voice from clips of them saying the phrase.
 public protocol WakeEnrolling: Sendable {
-    /// Record up to `seconds` from the mic, ending early after speech then ~0.8 s of silence.
-    func record(seconds: Double) async throws -> Clip
     /// Given clips of the user saying the phrase (positives) and saying other things (negatives: another
     /// "hey <name>", the name alone, "hey there"), learn the token sequences the model hears for the phrase
     /// and choose a threshold with a margin above every negative and below every positive. Offline, < 2 s.

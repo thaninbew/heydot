@@ -1,22 +1,19 @@
 import SwiftUI
 
-// MARK: Buttons
-
 enum FrostRole { case primary, secondary, round, chip, hangUp }
 
 extension View {
     /// Every Frost button is one capsule (or circle) whose size HeyDot sets, so primary and secondary buttons
-    /// share one height and base width. macOS 26 fills it with Liquid Glass (violet-tinted for the primary); 14 and
+    /// share one height and base width. macOS 26 fills it with Liquid Glass (accent-tinted for the primary); 14 and
     /// 15, and QA renders, draw the fallback.
     func frostButton(_ role: FrostRole) -> some View { modifier(FrostButtonModifier(role: role)) }
 }
 
 private struct FrostButtonModifier: ViewModifier {
     let role: FrostRole
-    @Environment(\.frostSnapshot) private var snapshot
 
     func body(content: Content) -> some View {
-                content.buttonStyle(FrostButtonStyle(role: role, ownFocusRing: true)).focusEffectDisabled()
+        content.buttonStyle(FrostButtonStyle(role: role, ownFocusRing: true)).focusEffectDisabled()
     }
 }
 
@@ -77,7 +74,7 @@ private struct FrostButtonBody: View {
         }
     }
 
-    /// macOS 14 and 15: a violet gradient capsule with a top highlight, or a frosted white capsule.
+    /// macOS 14 and 15: an accent gradient capsule with a top highlight, or a frosted white capsule.
     @ViewBuilder private var drawn: some View {
         let dark = scheme == .dark
         if filled {

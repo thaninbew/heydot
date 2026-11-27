@@ -5,8 +5,6 @@ extension Paths {
     public var controlSocket: URL { runDirectory.appendingPathComponent("control.sock") }
 }
 
-// MARK: The app's side
-
 extension AppModel {
     /// What `--control status` reports. `wake` is "on" while the engine listens for the phrase, "off" while
     /// paused, and null otherwise (setup needed, microphone off, engine failed).

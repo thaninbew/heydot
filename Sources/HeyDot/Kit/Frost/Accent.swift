@@ -1,10 +1,7 @@
 import Foundation
 
-// MARK: Accent
-
-/// The UI accent follows the dot's colour: its hue and saturation, with lightness moved into the one band where
-/// white button text stays readable (at least 4.5:1) and marks still stand out on a dark window (at least 3:1
-/// against #1E1E1E) and a light one. The default logo, custom avatars and an undesigned dot use the logo's coral.
+/// Colour rules for the accent (DESIGN.md, "Theme from dot"): the pill fill, the label on it, marks drawn on the
+/// window, and the contrast maths behind them.
 enum Accent {
     static let defaultHex: UInt32 = 0xFB817A  // the logo's coral
     static let darkWindow: UInt32 = 0x1E1E1E
@@ -12,12 +9,9 @@ enum Accent {
     /// Relative luminance band that meets both contrast floors.
     static let band: ClosedRange<Double> = 0.145...0.183
 
-    /// The accent for text and marks drawn on the window (rings, progress, level bars, ticks): in dark mode lifted
-    /// until it reads at 4.5:1 on a dark window; in light mode the fill colour already does (`band`).
-    ///
-    /// Since round 7 the accent is the dot's own colour, so marks (rings, progress, level bars, ticks, focus) use the
-    /// same hue moved in OKLCH lightness only as far as 3:1 against the window needs: lime deepens a little on a light
-    /// window, a near-black lightens on a dark one, and most colours stay as they are.
+    /// The accent for marks drawn on the window (rings, progress, level bars, ticks, focus): the same hue moved in
+    /// OKLCH lightness only as far as 3:1 against the window needs. Lime deepens a little on a light window, a
+    /// near-black lightens on a dark one, and most colours stay as they are.
     static func mark(_ hex: UInt32, dark: Bool) -> UInt32 {
         let window = dark ? darkWindow : lightWindow
         guard contrast(hex, window) < markContrast else { return hex }
@@ -68,7 +62,8 @@ enum Accent {
 
     static func hex(for design: DotDesign) -> UInt32 { ui(source(for: design)) }
 
-    /// The colour moved into `band` by lightness only (unchanged when already inside it).
+    /// The colour moved into `band` by lightness only (unchanged when already inside it). Frost's own accent, for
+    /// imported avatars (`Theme.frost`).
     static func ui(_ hex: UInt32) -> UInt32 {
         guard !band.contains(luminance(hex)) else { return hex }
         let (h, s, _) = hsl(hex)
