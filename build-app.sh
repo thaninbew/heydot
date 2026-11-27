@@ -82,6 +82,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>NSMicrophoneUsageDescription</key><string>HeyDot listens on this Mac for your dot's name so it can start the call. Wake-word audio is processed on device and never uploaded. During a voice call, microphone audio goes to ChatGPT.</string>
 <key>SUFeedURL</key><string>$FEED_URL</string>
 <key>SUPublicEDKey</key><string>$SPARKLE_PUBLIC_KEY</string>
+<key>SUEnableAutomaticChecks</key><true/>
 <key>NSHumanReadableCopyright</key><string>HeyDot. Unofficial; not affiliated with OpenAI.</string>
 </dict></plist>
 PLIST
