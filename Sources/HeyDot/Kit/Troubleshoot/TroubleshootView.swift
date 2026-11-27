@@ -141,10 +141,8 @@ struct TroubleshootView: View {
     }
 
     func fix(_ title: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).fontWeight(primary ? .semibold : .regular).lineLimit(1).fixedSize()
-        }
-        .frostButton(.chip)
+        Button(action: action) { Text(title).fixedSize() }
+            .frostButton(primary ? .primaryChip : .chip)
     }
 
     @ViewBuilder var footer: some View {

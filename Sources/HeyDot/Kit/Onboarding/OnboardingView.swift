@@ -190,17 +190,8 @@ struct OnboardingView: View {
     var nameStep: some View {
         VStack(spacing: 0) {
             FloatingTile(design: app.settings.design, size: 100)
-            Group {
-                if flow.designDeferred {
-                    // Later keeps it here (and on the last step, the menu bar and Settings), just quieter.
-                    Button { flow.openDotMaker() } label: { Label("Design your dot", systemImage: "paintpalette") }
-                        .buttonStyle(.plain).font(.system(size: 14, weight: .medium)).foregroundStyle(.secondary)
-                        .help("Any time from the menu bar or Settings.")
-                } else {
-                    designPill
-                }
-            }
-            .frame(height: 34)
+            designChips
+                .frame(height: 34)
             .padding(.top, 18)
             heading("Name your dot", "Use the name it has in ChatGPT.").padding(.top, 18)
             HStack(alignment: .top, spacing: 14) {
@@ -244,21 +235,19 @@ struct OnboardingView: View {
         }
     }
 
-    var designPill: some View {
-        HStack(spacing: 0) {
-            Button { flow.openDotMaker() } label: {
-                Label("Design your dot", systemImage: "paintpalette").padding(.horizontal, 14).frame(height: 32)
+    /// Design your dot, and Later until it is pressed. Later keeps Design your dot here (and on the last step, the
+    /// menu bar and Settings).
+    var designChips: some View {
+        HStack(spacing: Frost.Space.s) {
+            Button { flow.openDotMaker() } label: { Label("Design your dot", systemImage: "paintpalette") }
+                .frostButton(.chip)
+                .help("Any time from the menu bar or Settings.")
+            if !flow.designDeferred {
+                Button("Later") { withAnimation(.easeOut(duration: 0.2)) { flow.designDeferred = true } }
+                    .frostButton(.chip)
+                    .help("Design it any time from the menu bar or Settings.")
             }
-            Divider().frame(height: 18)
-            Button { withAnimation(.easeOut(duration: 0.2)) { flow.designDeferred = true } } label: {
-                Text("Later").foregroundStyle(.secondary).padding(.horizontal, 14).frame(height: 32)
-            }
-            .help("Design it any time from the menu bar or Settings.")
         }
-        .buttonStyle(.plain)
-        .font(.system(size: 14, weight: .medium))
-        .fixedSize()
-        .background(Capsule().fill(.background.opacity(0.75)).shadow(color: .black.opacity(0.08), radius: 2, y: 1))
     }
 
     // MARK: Voice
@@ -494,7 +483,7 @@ struct OnboardingView: View {
                 Toggle("Open at login", isOn: $flow.launchAtLogin).toggleStyle(.switch).controlSize(.small)
                 if flow.designDeferred {
                     Button { flow.openDotMaker() } label: { Label("Design your dot", systemImage: "paintpalette") }
-                        .buttonStyle(.plain)
+                        .frostButton(.chip)
                 }
             }
             .font(.callout).foregroundStyle(.secondary)

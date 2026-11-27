@@ -61,7 +61,7 @@ struct DotMakerView: View {
                 }
                 Divider()
                 HStack(spacing: Frost.Space.m) {
-                    Button("Reset to HeyDot") { draft = draft.logo }.frostButton(.chip)
+                    Button("Reset to HeyDot") { draft = draft.logo }.frostButton(.secondary)
                     Spacer()
                     Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction).frostButton(.secondary)
                     Button("Save") { onSave(draft, menuBarIcon) }.keyboardShortcut(.defaultAction).frostButton(.primary)

@@ -53,7 +53,7 @@ final class OnboardingModel: ObservableObject {
     @Published var nameError: String?
     /// The wake phrase field on the naming step; nil while it follows the name ("Hey <Name>").
     @Published var phraseDraft: String?
-    /// "Later" on the design pill: the pill shrinks to a plain Design your dot button (still there, and on Done).
+    /// Later on the name step: Later goes away and Design your dot stays (there, and on Done).
     @Published var designDeferred = false
     @Published var micStatus: AVAuthorizationStatus
 

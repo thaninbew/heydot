@@ -225,10 +225,10 @@ To test persistent WebKit, use a separate bundle ID and a fresh `HEYDOT_WEBKIT_S
 
 ## First run
 
-Guided: welcome, name your dot (default "Dot"; 1 to 3 words; "jarvis" is reserved; "Design your dot · Later"
-sits under the tile; Name and Wake word are separate fields, the wake word on **Auto** ("Hey <Name>") until
-typed in; both changeable in Settings), voice tuning, connect ChatGPT, done. "Design your dot · Later" leaves a
-plain Design your dot button there and on the last step (and the popover's palette icon). Tuning has **Later**
+Guided: welcome, name your dot (default "Dot"; 1 to 3 words; "jarvis" is reserved; **Design your dot** and **Later**
+chips sit under the tile; Name and Wake word are separate fields, the wake word on **Auto** ("Hey <Name>") until
+typed in; both changeable in Settings), voice tuning, connect ChatGPT, done. **Later** leaves the Design your dot
+chip there and adds one on the last step (and the popover's palette icon). Tuning has **Later**
 (standard settings, re-run from Settings > Voice tuning). Settings > Your dot has the same Wake phrase field; a change there re-runs voice tuning.
 
 **Voice tuning is one screen.** It first shows the microphone permission as macOS reports it

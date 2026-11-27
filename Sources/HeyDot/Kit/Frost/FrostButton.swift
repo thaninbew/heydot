@@ -1,6 +1,8 @@
 import SwiftUI
 
-enum FrostRole { case primary, secondary, round, chip, hangUp }
+/// The button roles (DESIGN.md, Pills). `wide` is the popover's one main action, a primary pill as wide as the popover;
+/// `primaryChip` is the recommended action among chips (the fix Troubleshoot suggests first).
+enum FrostRole { case primary, wide, secondary, round, chip, primaryChip, hangUp }
 
 extension View {
     /// Every Frost button is one capsule (or circle) whose size HeyDot sets, so primary and secondary buttons
@@ -40,18 +42,22 @@ private struct FrostButtonBody: View {
     @Environment(\.isFocused) private var focused
 
     private var circular: Bool { role == .round || role == .hangUp }
-    private var filled: Bool { role == .primary || role == .hangUp }
+    private var chip: Bool { role == .chip || role == .primaryChip }
+    /// Filled with the accent (the label takes `Accent.label`).
+    private var accented: Bool { role == .primary || role == .wide || role == .primaryChip }
+    private var filled: Bool { accented || role == .hangUp }
     private var shape: AnyShape { circular ? AnyShape(Circle()) : AnyShape(Capsule()) }
 
     var body: some View {
-        let height = role == .chip ? Frost.chipHeight : Frost.pillHeight
+        let height = chip ? Frost.chipHeight : Frost.pillHeight
         configuration.label
-            .font(.system(size: role == .chip ? 13 : 15, weight: filled ? .semibold : .medium))
-            .foregroundStyle(role == .hangUp ? Color.white : role == .primary ? Color(hex: Accent.label(on: accentHex))
+            .frame(maxWidth: role == .wide ? .infinity : nil)
+            .font(.system(size: chip ? 13 : 15, weight: filled ? .semibold : .medium))
+            .foregroundStyle(role == .hangUp ? Color.white : accented ? Color(hex: Accent.label(on: accentHex))
                              : (configuration.role == .destructive ? Color.red : Color.primary))
             .lineLimit(1)
-            .padding(.horizontal, circular ? 0 : (role == .chip ? 11 : 24))
-            .frame(minWidth: circular ? height : (role == .chip ? nil : FrostButtonStyle.baseWidth), minHeight: height)
+            .padding(.horizontal, circular ? 0 : (chip ? 11 : 24))
+            .frame(minWidth: circular ? height : (chip ? nil : FrostButtonStyle.baseWidth), minHeight: height)
             .background { surface }
             .overlay {
                 // The keyboard focus ring, in the accent (the system ring is turned off for these buttons).
@@ -64,7 +70,7 @@ private struct FrostButtonBody: View {
     }
 
     @ViewBuilder private var surface: some View {
-        let tint: Color? = role == .primary ? accent : (role == .hangUp ? Color(hex: 0xF0453C) : nil)
+        let tint: Color? = accented ? accent : (role == .hangUp ? Color(hex: 0xF0453C) : nil)
         if #available(macOS 26, *), !snapshot {
             Color.clear
                 .glassEffect(tint.map { Glass.regular.tint($0).interactive() } ?? Glass.regular.interactive(), in: shape)

@@ -16,19 +16,14 @@ struct MicrophoneMenu: View {
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: Frost.Space.s) {
                 Image(systemName: "mic")
                 Text(MicrophoneChoices(devices: devices, selection: selection).current)
-                Image(systemName: "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Image(systemName: "chevron.down").imageScale(.small).foregroundStyle(.secondary)
             }
-            .font(.system(size: 14))
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 14).frame(height: 32)
-            .background(Capsule().fill(.background.opacity(0.75)).shadow(color: .black.opacity(0.08), radius: 2, y: 1))
-            .contentShape(Capsule())
         }
         .menuStyle(.button)
-        .buttonStyle(.plain)
+        .frostButton(.chip)
         .menuIndicator(.hidden)
         .fixedSize()
         .accessibilityLabel("Microphone")

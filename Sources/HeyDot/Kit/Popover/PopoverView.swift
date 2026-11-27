@@ -126,9 +126,8 @@ struct PopoverView: View {
             } else {
                 Button { Task { await model.callNow() } } label: {
                     Label(model.calling ? "Calling\u{2026}" : "Call \(model.displayName)", systemImage: "phone.fill")
-                        .frame(maxWidth: .infinity)
                 }
-                .frostButton(.primary)
+                .frostButton(.wide)
                 .disabled(!model.canCallNow)
                 .help("Starts your dot's call now, the same way \u{201C}\(Phrase.title(model.settings.phrase))\u{201D} does.")
             }
@@ -155,7 +154,7 @@ struct PopoverView: View {
     }
 
     func wide(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Label(title, systemImage: symbol).frame(maxWidth: .infinity) }.frostButton(.primary)
+        Button(action: action) { Label(title, systemImage: symbol) }.frostButton(.wide)
     }
 
     /// Round Mute (built-in calls only, where WebKit reports the real state) and Hang up.
@@ -243,13 +242,12 @@ struct PopoverView: View {
             Divider()
             Button("Custom duration\u{2026}") { customPause = true }
         } label: {
-            Image(systemName: "timer").font(.system(size: 14, weight: .medium)).foregroundStyle(Color.primary)
+            Image(systemName: "timer")
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .frostButton(.chip)
         .menuIndicator(.hidden)
         .fixedSize()
-        .frame(width: 32, height: 30)
-        .background(Color.primary.opacity(0.06), in: Circle())
         .accessibilityLabel("More pause options")
         .help("More: 30 minutes, 2 or 4 hours, until you turn it back on, or a custom time.")
     }
