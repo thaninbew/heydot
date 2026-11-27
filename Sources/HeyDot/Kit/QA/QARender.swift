@@ -152,7 +152,6 @@ enum QARender {
             try both("onboarding-1-welcome") { flow(.welcome) }
             try both("onboarding-3-name") { flow(.name) }
             try both("onboarding-3b-name-wake-word") { flow(.name, tweak: { f in f.nameDraft = "Tray"; f.editPhrase(); f.phraseDraft = "Okay Tray" }) }
-            try both("onboarding-3c-name-wake-word-reserved") { flow(.name, tweak: { f in f.nameDraft = "Tray"; f.editPhrase(); f.phraseDraft = "Hey Siri" }) }
             try both("onboarding-4a-voice-permission") { flow(.voice, mic: .notDetermined) }
             try both("onboarding-4b-voice-listening") { flow(.voice, tweak: { f in
                 f.takes = takes(2); f.listening = true; f.tuningStarted = true; f.levels.set(speech)

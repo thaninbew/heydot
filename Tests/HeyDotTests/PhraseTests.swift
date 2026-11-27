@@ -14,9 +14,9 @@ import WebKit
     #expect(Phrase.phrase(forName: "Dot") == "hey dot")
 }
 
-@Test func reservedAndMalformedNamesAreRejected() {
-    #expect(Phrase.validateName("Jarvis") == .failure(.reserved("jarvis")))
-    #expect(Phrase.validateName("little JARVIS") == .failure(.reserved("jarvis")))
+@Test func anyNameIsAllowedButMalformedOnesAreRejected() throws {
+    #expect(try Phrase.validateName("Jarvis").get() == "Jarvis")
+    #expect(try Phrase.validateName("siri").get() == "Siri")
     #expect(Phrase.validateName("") == .failure(.empty))
     #expect(Phrase.validateName("a b c d") == .failure(.wordCount))
     #expect(Phrase.validateName("R2D2") == .failure(.characters("r2d2")))
@@ -37,9 +37,8 @@ import WebKit
     #expect(Phrase.validateWakePhrase("one two three four five six seven") == .failure(.wordCount))
     #expect(Phrase.validateWakePhrase("hey tray2") == .failure(.characters("tray2")))
     #expect(Phrase.validateWakePhrase("hey o'neil") == .failure(.characters("o'neil")))
-    #expect(Phrase.validateWakePhrase("Hey Siri") == .failure(.reserved("siri")))
-    #expect(Phrase.validateWakePhrase("hey jarvis") == .failure(.reserved("jarvis")))
-    #expect(Phrase.validateWakePhrase("ok google play") == .failure(.reserved("ok google")))
+    #expect(try Phrase.validateWakePhrase("Hey Jarvis", encodable: { _ in true }).get() == "hey jarvis")
+    #expect(try Phrase.validateWakePhrase("ok google play", encodable: { _ in true }).get() == "ok google play")
     #expect(Phrase.validateWakePhrase("hey tray", encodable: { _ in false }) == .failure(.notEncodable))
     #expect(Phrase.title("okay tray") == "Okay Tray")
 }
