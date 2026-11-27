@@ -1,11 +1,42 @@
 # HeyDot
 
 A macOS menu bar app (SwiftUI, Swift 6, macOS 14+). Say "Hey" plus your dot's name and HeyDot starts
-that dot's voice call in its own hidden, signed-in web view. It replaces the Python listener.
+that dot's voice call in its own hidden, signed-in web view.
 
 Unofficial; not affiliated with OpenAI. Wake-word listening runs on device and its audio is never uploaded. Call audio goes to ChatGPT like any ChatGPT voice call. The built-in web view contacts ChatGPT and its sign-in providers. Details: [SECURITY.md](../SECURITY.md).
 
 Requires your own eligible ChatGPT account with existing dot access. Calls remain subject to ChatGPT’s terms and limits. This independent integration depends on ChatGPT’s interface and may stop working when it changes. Integration permission, clean-machine acceptance, public binary trust and fixture redistribution remain release gates; see [Third-party notices](../THIRD_PARTY_NOTICES.md).
+
+## Code map
+
+`Sources/HeyDot/Main` only calls `HeyDotMain.run`. Everything else in the app is the `HeyDotKit` target in
+`Sources/HeyDot/Kit`, internal except that entry point; the on-device listener is the `WakeEngine` target.
+
+| `Sources/HeyDot/Kit/` | What it holds |
+| --- | --- |
+| `App/` | `HeyDotMain` (launch flags), `AppDelegate` (status item, windows), `AppModel` (status, listening, calls, settings changes), `SystemHooks`, `Updates` (Sparkle) |
+| `Core/` | The settings file, paths, name and wake phrase rules, the log, the lifecycle lease, erase and uninstall, listener usage |
+| `Control/` | `--control`: the command line, the app-side service and timed-pause expiry, the socket and its JSON |
+| `Web/` | The built-in browser: `WebCalling` (and `NoWeb` for fixtures), `WebCallBackend`, the sign-in window, page scripts, `CallResult` and its messages, the WebCrypto key |
+| `Dot/` | The dot: `DotDesign` (the saved design), `DotGeometry` (every vector part), `DotView` and `DotTile`, `DotGlyph` (menu bar), imported avatars, the logo |
+| `Frost/` | The design system in [DESIGN.md](../DESIGN.md): tokens, `Theme`, `Accent`, `OKLCH`, backdrop, floating tile, button roles, cards, fields, choices, banners |
+| `Components/` | Views several windows share: the microphone menu, the menu bar icon picker, the result banner, level bars |
+| `Onboarding/`, `Popover/`, `Settings/`, `DotMaker/`, `Troubleshoot/` | One folder per window: its view, and its model when it has one (`OnboardingModel`, `Troubleshooter`) |
+| `QA/` | `--qa-render`, `--qa-boards` and `--qa-signin`, with fakes that never touch the microphone, login items or the profile |
+| `Resources/` | Files compiled into the binary: the logo PNGs and the avatar prompt |
+
+| `Sources/WakeEngine/` | What it holds |
+| --- | --- |
+| `WakeEngineAPI.swift` | Everything the app uses: `WakeSettings`, `WakeEvent`, errors, `WakeListening`, `WakeEnrolling` |
+| `Microphone.swift` | The capture session, the live `WakeEngine` listener and the `Enroller` (voice tuning calibration) |
+| `Supervisor.swift` | `ListenerSupervisor`: restarts, display sleep and lock, device changes |
+| `Spotter.swift`, `Decoder.swift`, `Tokenizer.swift` | Keyword spotting, what the model heard (`PhraseDecoder`, `Takes`), the model's tokenizer |
+| `Utterances.swift` | Utterance segmentation and the `TuningListener` |
+| `AudioInputs.swift`, `ListenerMeter.swift` | Which microphone to use; the listener's CPU and memory readout |
+| `EngineCheck/` | `heydot-engine-check`, a command line that runs the engine on a WAV file |
+
+Tests: `Tests/HeyDotTests` has one file per behavior (`OnboardingTests`, `CallTests`, `ThemeTests` and so on) plus
+`TestSupport.swift` for shared fakes; `Tests/WakeEngineTests` covers the engine with WAV fixtures.
 
 ## How it works
 
@@ -39,8 +70,7 @@ Requires your own eligible ChatGPT account with existing dot access. Calls remai
   estimate (hence `~`): the footprint growth measured while the first keyword model loaded (never less
   than the model files), per loaded model, plus the bounded audio queue. The built-in browser's WebKit
   processes are not included.
-- **Built-in browser:** `Web/WebCallBackend.swift`, from the `hidden-browser-spike` WKWebView
-  probe. Sign-in happens once in a visible "Sign in to ChatGPT" window (Return goes to the page's form; Done is
+- **Built-in browser:** `Web/WebCallBackend.swift`. Sign-in happens once in a visible "Sign in to ChatGPT" window (Return goes to the page's form; Done is
   not a default button). The page offers its available sign-in methods; providers can reject embedded
   WebKit, notably Google. If that happens, try another sign-in method offered for your account. An external
   browser session is not imported into HeyDot. Provider sign-in paths have not been verified for this snapshot.
@@ -110,7 +140,7 @@ the dot's own colours for the bar's light or dark appearance, with an orange att
 ## Look: Frost
 
 The design language (glass, pills, radii, spacing, type, accent, motion, icons, native exceptions) is written down
-in [DESIGN.md](../DESIGN.md); `Kit/UI/Frost.swift` implements it. HeyDot's hidden main menu gives every HeyDot window
+in [DESIGN.md](../DESIGN.md); `Kit/Frost/` implements it. HeyDot's hidden main menu gives every HeyDot window
 Command-Q (quit; mid-setup it stops tuning first and setup reopens next launch), Command-W and the Edit shortcuts.
 
 Setup is a see-through window the wallpaper tints (`NSVisualEffectView`, behind-window) with two soft tint blobs
@@ -124,7 +154,7 @@ The default logo uses coral. Redesigning a dot updates the buttons, focus rings,
 and popover meter to follow its colours. Imported avatars use the Frost theme.
 Motion is Core Animation on plain layers (the tile is rendered once into a layer), so it costs the app no
 CPU, stops when the window closes, and is off with Reduce Motion. Closing a window releases its content. The
-popover draws the same tint statically. `Kit/UI/Frost.swift` holds the pieces.
+popover draws the same tint statically.
 
 ## Popover
 
