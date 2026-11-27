@@ -212,7 +212,9 @@ and its code signature matches the running app's.
    keychain password, so click Always Allow.
 4. Attach the zip to the GitHub release, then add an `<item>` to `appcast.xml` whose enclosure points at that asset,
    with `sparkle:version` set to the build, `sparkle:shortVersionString` to the version and
-   `sparkle:minimumSystemVersion` 14.0. Merging it to `main` offers the update to everyone.
+   `sparkle:minimumSystemVersion` 14.0, and short release notes as HTML in a `<description><![CDATA[…]]></description>`.
+   Sparkle shows those in its update window; a `releaseNotesLink` to the GitHub release would load the whole page.
+   Merging it to `main` offers the update to everyone.
 
 The private key was made once with Sparkle's `generate_keys` and lives only in the maintainer's keychain; back it
 up with `generate_keys -x <file>` to somewhere safe. Sparkle accepts a new EdDSA key only in an update signed with

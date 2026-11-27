@@ -10,7 +10,17 @@
       <sparkle:version>2.5</sparkle:version>
       <sparkle:shortVersionString>0.2.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/thaninbew/heydot/releases/tag/v0.2.5</sparkle:releaseNotesLink>
+      <description><![CDATA[
+<h3>HeyDot now learns how you say your dot's name</h3>
+<ul>
+<li><b>Voice tuning that listens to you.</b> Say the phrase four times, your way. Fast speech and unusual names work. If you tuned before, run Settings &gt; Voice tuning again.</li>
+<li><b>No pause needed.</b> Saying "hey" and the name quickly now wakes your dot, and more names wake reliably on standard settings.</li>
+<li><b>Setup finds your dot</b> after you sign in and fills in its link.</li>
+<li><b>A tidier dot designer</b> and steadier setup screens.</li>
+<li><b>Erase and Start Over</b> in Settings &gt; Privacy.</li>
+<li><b>Fixes:</b> reopening setup no longer keeps the microphone busy, and tuning is never saved under the wrong phrase.</li>
+</ul>
+]]></description>
       <pubDate>Fri, 27 Nov 2026 22:45:27 +0000</pubDate>
       <enclosure url="https://github.com/thaninbew/heydot/releases/download/v0.2.5/HeyDot-0.2.5.zip" sparkle:edSignature="41ifzCWJj29ipa175IWPZVqaboKBemOyhQTwLjZb7bYbFRtRl0af065yneA6KemvQ4+n1K0K47BObvCWDUHzDw==" length="13858331" type="application/octet-stream"/>
     </item>
