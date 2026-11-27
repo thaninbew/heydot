@@ -7,13 +7,15 @@
 | What | Where it goes | When |
 | --- | --- | --- |
 | Your ChatGPT session (the chatgpt.com page, your sign-in, the voice call) | chatgpt.com, and the sign-in page you choose (OpenAI, Google, Apple or Microsoft) | When you sign in, when HeyDot keeps your dot's page ready, and during a call |
-| An update check (Sparkle): a request for `appcast.xml` that carries HeyDot's and Sparkle's versions in its User-Agent, no system profile | raw.githubusercontent.com | Once a day if you allow automatic checks (Sparkle asks on the second launch), or when you click **Check for Updates…** in Settings |
+| An update check (Sparkle): a request for `appcast.xml` that carries HeyDot's and Sparkle's versions in its User-Agent, no system profile | raw.githubusercontent.com | Once a day if you allow automatic checks, or when you click **Check for Updates…**. Change your preference under **Settings > General > Automatically check for updates**. |
 | An update download | github.com release assets | When you choose to install an update |
 
 Apart from Sparkle's update checks, HeyDot's own code makes no network requests. Searching the source finds no `URLSession`, `Network`
 framework, sockets to remote hosts, crash reporters or analytics. Sparkle installs an update only when its EdDSA signature matches the public key built into HeyDot and it is signed with the same certificate as the running app. Its call view restricts top-level navigation to `https://chatgpt.com/...`; this is not a firewall for page resources or sign-in providers.
 
 ## What HeyDot stores, and where
+
+After a check fails in **Not working?**, **Copy troubleshooting report** copies the app version, failed step and a predefined reason to your clipboard. You choose where to paste it.
 
 | What | Where | Protection |
 | --- | --- | --- |

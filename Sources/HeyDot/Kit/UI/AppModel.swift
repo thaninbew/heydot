@@ -90,25 +90,42 @@ public final class AppModel: ObservableObject {
     // MARK: Settings
 
     public func update(_ change: (inout AppSettings) -> Void) {
-        guard !stopped else { return }
+        applySettingsChange(change)
+    }
+
+    /// Finishing setup requires a saved file. A standalone voice tuning session only commits its tuning changes.
+    func saveOnboarding(launchAtLogin: Bool?) -> Bool {
+        applySettingsChange(requireSavedSettings: true) { settings in
+            if let launchAtLogin {
+                settings.launchAtLogin = launchAtLogin
+                settings.onboarded = true
+            }
+        }
+    }
+
+    @discardableResult
+    private func applySettingsChange(requireSavedSettings: Bool = false, _ change: (inout AppSettings) -> Void) -> Bool {
+        guard !stopped else { return false }
         var next = settings
         change(&next)
         next.wake.phrase = next.phrase
         if !next.paused { next.pausedUntil = nil }
-        guard next != settings else { return }
+        guard next != settings || (requireSavedSettings && settingsError != nil) else { return true }
         let restart = next.wake != settings.wake || next.paused != settings.paused || next.onboarded != settings.onboarded
         let rewarm = next.dotURL != settings.dotURL
         let repause = next.paused != settings.paused || next.pausedUntil != settings.pausedUntil
         // A new microphone takes effect at once if the listener runs (voice tuning stops it and restarts it after).
         let reinput = next.inputDeviceUID != settings.inputDeviceUID && engine.isListening
-        settings = next
         do { try store?.save(next); settingsError = nil } catch {
             settingsError = "Couldn't save settings: \(error.localizedDescription)"
             log.write("settings: save failed: \(error)")
+            if requireSavedSettings { return false }
         }
+        settings = next
         if restart || reinput { refreshListening() }
         if rewarm { warmWeb() }
         if repause { onPauseChange?() }
+        return true
     }
 
     // MARK: Status

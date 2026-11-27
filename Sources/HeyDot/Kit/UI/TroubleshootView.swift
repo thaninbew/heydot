@@ -10,10 +10,31 @@ final class Troubleshooter: ObservableObject {
     enum Step: Int, CaseIterable, Identifiable {
         case microphoneAccess, listening, hearing, phrase, signIn, callButton
         var id: Int { rawValue }
+
+        var reportCode: String {
+            switch self {
+            case .microphoneAccess: "microphone-access"
+            case .listening: "listening"
+            case .hearing: "hearing"
+            case .phrase: "wake-phrase"
+            case .signIn: "sign-in"
+            case .callButton: "call-button"
+            }
+        }
     }
 
-    enum Problem: Equatable {
-        case micNotAsked, micDenied, paused, engine, silent, quiet, phraseMissed, signedOut, challenge, unreachable, callButton
+    enum Problem: String {
+        case micNotAsked = "microphone-permission-needed"
+        case micDenied = "microphone-permission-denied"
+        case paused = "listening-paused"
+        case engine = "listener-failed"
+        case silent = "no-microphone-input"
+        case quiet = "microphone-input-too-quiet"
+        case phraseMissed = "wake-phrase-missed"
+        case signedOut = "signed-out"
+        case challenge = "sign-in-challenge"
+        case unreachable = "chatgpt-unreachable"
+        case callButton = "call-button-unavailable"
     }
 
     enum State: Equatable {
@@ -73,6 +94,18 @@ final class Troubleshooter: ObservableObject {
     }
 
     func retry(_ step: Step) { start(from: step) }
+
+    func copyReport(to pasteboard: NSPasteboard = .general) -> Bool {
+        guard !running, let failed, case .problem(let problem, _) = state(failed) else { return false }
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        let report = """
+            HeyDot version: \(version)
+            Step: \(failed.reportCode)
+            Reason: \(problem.rawValue)
+            """
+        pasteboard.clearContents()
+        return pasteboard.setString(report, forType: .string)
+    }
 
     /// For QA fixtures only.
     func setFixture(_ fixture: [Step: State], running: Bool = false) { states = fixture; self.running = running }
@@ -181,6 +214,7 @@ struct TroubleshootView: View {
     var signIn: () -> Void
     var close: () -> Void
     @State private var devices: [AudioInput] = []
+    @State private var reportFeedback: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -200,6 +234,9 @@ struct TroubleshootView: View {
         .background(FrostBackdrop(animated: false).ignoresSafeArea())
         .frostAccent(model.settings.design)
         .onAppear { devices = AudioInputs.all() }
+        .onReceive(doctor.$running) { running in
+            if running { reportFeedback = nil }
+        }
     }
 
     static func title(_ step: Troubleshooter.Step, phrase: String) -> String {
@@ -226,12 +263,26 @@ struct TroubleshootView: View {
                 case .problem(let problem, let text):
                     Text(text).font(.callout).fixedSize(horizontal: false, vertical: true)
                     fixes(step, problem)
+                    if !doctor.running && step == doctor.failed {
+                        HStack(spacing: 8) {
+                            fix("Copy troubleshooting report", action: copyReport)
+                            if let reportFeedback {
+                                Text(reportFeedback).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 case .waiting: EmptyView()
                 }
             }
             Spacer(minLength: 0)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func copyReport() {
+        let message = doctor.copyReport() ? "Report copied" : "Couldn't copy report"
+        reportFeedback = message
+        AccessibilityNotification.Announcement(message).post()
     }
 
     @ViewBuilder func icon(_ state: Troubleshooter.State) -> some View {

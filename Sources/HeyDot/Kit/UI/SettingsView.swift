@@ -136,6 +136,9 @@ struct SettingsView: View {
                     Text("Updates")
                     Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"). Updates come from HeyDot's GitHub page.")
                 }
+                Toggle("Automatically check for updates", isOn: Binding(get: { updates.automaticChecksEnabled },
+                                                                        set: updates.setAutomaticChecksEnabled))
+                    .disabled(!updates.canConfigureAutomaticChecks)
             }
             Section("Privacy") {
                 PrivacyNote(phrase: model.settings.phrase, viewer: "settings")
