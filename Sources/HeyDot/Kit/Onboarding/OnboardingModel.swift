@@ -571,3 +571,14 @@ final class OnboardingModel: ObservableObject {
 extension Result {
     var isSuccess: Bool { if case .success = self { return true }; return false }
 }
+
+/// Recent input levels for the tuning waveform, newest last. Its own object so 20 updates a second
+/// redraw only the waveform, not the whole onboarding window.
+@MainActor
+final class LevelHistory: ObservableObject {
+    static let count = 72
+    @Published private(set) var levels = [Float](repeating: -160, count: LevelHistory.count)
+    func push(_ db: Float) { levels.removeFirst(); levels.append(db) }
+    func reset() { levels = [Float](repeating: -160, count: Self.count) }
+    func set(_ values: [Float]) { levels = Array((Array(repeating: -160, count: Self.count) + values).suffix(Self.count)) }
+}

@@ -325,26 +325,25 @@ struct IconButton: View {
     }
 }
 
-/// Five small bars that follow the listener's input level (-60 dBFS flat, -6 dBFS full).
-/// The one input-level meter (popover, Not working?): five bars that sit as equal dots in silence and rise into a
-/// centred peak with the voice.
-struct LevelBars: View {
-    var level: Float
+/// A status dot plus line, coloured by state.
+struct StatusPill: View {
+    let status: AppStatus
+    let text: String
     @Environment(\.self) private var env
-    private static let shape: [CGFloat] = [0.45, 0.8, 1, 0.7, 0.5]
-    private static let width: CGFloat = 3, height: CGFloat = 20
-    var body: some View {
-        let f = CGFloat(max(0, min(1, (level + 60) / 54)))
-        HStack(alignment: .center, spacing: 2.5) {
-            ForEach(0..<5, id: \.self) { i in
-                Capsule().fill(env.frostMark)
-                    .frame(width: Self.width, height: Self.width + (Self.height - Self.width) * Self.shape[i] * f)
-            }
+
+    var color: Color {
+        switch status {
+        case .listening: env.frostMark
+        case .calling: env.frostMark
+        case .paused: .secondary
+        default: .orange
         }
-        .animation(.easeOut(duration: 0.12), value: f)
-        .frame(height: 20)
-        .accessibilityElement()
-        .accessibilityLabel("Input level")
-        .accessibilityValue("\(Int(f * 100)) percent")
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(text).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+        }
     }
 }
