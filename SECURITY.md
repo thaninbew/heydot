@@ -7,7 +7,7 @@
 | What | Where it goes | When |
 | --- | --- | --- |
 | Your ChatGPT session (the chatgpt.com page, your sign-in, the voice call) | chatgpt.com, and the sign-in page you choose (OpenAI, Google, Apple or Microsoft) | When you sign in, when HeyDot keeps your dot's page ready, and during a call |
-| An update check (Sparkle): a request for `appcast.xml` that carries HeyDot's and Sparkle's versions in its User-Agent, no system profile | raw.githubusercontent.com | Once a day if you allow automatic checks, or when you click **Check for Updates…**. Change your preference under **Settings > General > Automatically check for updates**. |
+| An update check (Sparkle): a request for `appcast.xml` that carries HeyDot's and Sparkle's versions in its User-Agent, no system profile | raw.githubusercontent.com | When HeyDot starts and once a day while automatic checks are on (the default), or when you click **Check for Updates…**. Change your preference under **Settings > General > Automatically check for updates**. |
 | An update download | github.com release assets | When you choose to install an update |
 
 Apart from Sparkle's update checks, HeyDot's own code makes no network requests. Searching the source finds no `URLSession`, `Network`

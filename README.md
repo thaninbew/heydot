@@ -37,7 +37,7 @@ It's free, open source, and has no account, server or API key of its own. If Hey
 - **Out of the way.** A menu bar icon, no Dock icon. Pause for 15 minutes, an hour or until tomorrow. The microphone is released while your display sleeps or the Mac is locked.
 - **Your mic, not whatever's default.** It uses the built-in microphone unless you pick another, so it won't grab your AirPods mid FaceTime.
 - **Your dot, your colours.** Choose the coral HeyDot microphone or give your dot its own shape, colour and eyes. The whole app follows its colours.
-- **Updates itself.** HeyDot asks before it checks this repo for new versions, and installs them only when they carry the project's signature.
+- **Updates itself.** HeyDot checks this repo for new versions when it starts and once a day, and installs them only when they carry the project's signature. You can turn automatic checks off in Settings.
 
 ## Requirements
 
@@ -61,7 +61,7 @@ Prefer not to run a downloaded build? [Build it yourself](#build-from-source) in
 
 You don't have to talk to it, either: the menu bar popover has a **Call** button, so HeyDot also works as a one-click dial for your dot without switching to the ChatGPT window.
 
-**What leaves your Mac:** your normal ChatGPT session (the web view talks to ChatGPT and whichever sign-in provider you use), and update checks against this GitHub repo (once a day if you allow automatic checks, or when you click **Check for Updates…** in Settings). An update check sends only the request itself, with HeyDot's version in it. HeyDot has no servers, no analytics and no telemetry. Details in [SECURITY.md](SECURITY.md).
+**What leaves your Mac:** your normal ChatGPT session (the web view talks to ChatGPT and whichever sign-in provider you use), and update checks against this GitHub repo (when HeyDot starts and once a day, unless you turn automatic checks off, or when you click **Check for Updates…** in Settings). An update check sends only the request itself, with HeyDot's version in it. HeyDot has no servers, no analytics and no telemetry. Details in [SECURITY.md](SECURITY.md).
 
 ## Limitations
 

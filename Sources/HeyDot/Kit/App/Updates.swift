@@ -2,8 +2,9 @@ import Combine
 import Foundation
 import Sparkle
 
-/// Self-updates through Sparkle, from the appcast named by `SUFeedURL` in Info.plist. Sparkle asks once, on the
-/// second launch, before it checks automatically; "Check for Updates…" in Settings works either way.
+/// Self-updates through Sparkle, from the appcast named by `SUFeedURL` in Info.plist. Automatic checks are on by
+/// default (`SUEnableAutomaticChecks`): HeyDot checks at every launch and Sparkle again once a day. Turning them off in
+/// Settings stops both; "Check for Updates…" works either way.
 @MainActor
 final class Updates: NSObject, ObservableObject, SPUUpdaterDelegate {
     @Published private(set) var canCheck = false
@@ -21,6 +22,8 @@ final class Updates: NSObject, ObservableObject, SPUUpdaterDelegate {
         automaticChecksObservation = controller.updater.publisher(for: \.automaticallyChecksForUpdates, options: .new)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
+        // Sparkle's own schedule waits a day between checks; a launch is when a fix matters most.
+        if controller.updater.automaticallyChecksForUpdates { controller.updater.checkForUpdatesInBackground() }
     }
 
     var canConfigureAutomaticChecks: Bool { controller != nil }
