@@ -69,6 +69,23 @@ private func fixture(_ name: String) throws -> Clip {
         #expect(Hearing.judge(heard: decoder.pieces(clips[1]), phrase: "hey tray") != .phrase)
     }
 
+    @Test func tuningKeepsFastPhraseBeforePrerollFills() throws {
+        let phrase = try fixture("hey-dot-Daniel-320")
+        let pad = Clip(repeating: 0, count: 16000)
+        let decoder = try PhraseDecoder(directory: ModelFiles.locate())
+        for audio in [phrase + pad, pad + phrase + pad] {
+            var segmenter = UtteranceSegmenter()
+            var clips: [Clip] = []
+            for offset in stride(from: 0, to: audio.count, by: 683) {
+                clips += segmenter.feed(Array(audio[offset..<min(offset + 683, audio.count)]))
+            }
+            #expect(clips.count == 1)
+            for clip in clips {
+                #expect(Hearing.judge(heard: decoder.pieces(clip), phrase: "hey dot") == .phrase)
+            }
+        }
+    }
+
     /// A neutral synthetic rare-name regression: reject a different name, learn heard tokens,
     /// then catch a held-out wake utterance without answering confusables. The alternate spelling
     /// Lumynaropolis deliberately differs from the synthetic spoken name Luminaropolis.
