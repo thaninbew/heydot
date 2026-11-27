@@ -5,8 +5,8 @@ import CSherpa
 /// It reports which tokens the model itself hears in a sample. A rare name such as "Luminaropolis" is
 /// spelled `▁JE FF HA LO PO U LO S` by the tokenizer, but the model hears `▁LU MI NA ▁RO PO LI S`;
 /// the spotter matches exact token paths, so only the heard sequence can ever fire. Calibration stores
-/// those sequences as extra keywords (`WakeSettings.learned`), and tuning uses the heard words to tell the
-/// user truthfully whether a sample was the phrase.
+/// those sequences as extra keywords (`WakeSettings.learned`), and tuning compares the heard words of the
+/// user's takes with each other (`Takes`).
 final class PhraseDecoder {
     let handle: OpaquePointer
     init(directory: URL) throws {
@@ -44,26 +44,65 @@ final class PhraseDecoder {
     }
 }
 
-/// What a tuning sample sounded like, judged against the wake phrase from the words the model heard.
-public enum Hearing: Equatable, Sendable {
-    /// The wake phrase.
-    case phrase
-    /// The first word, then a different name ("Hey John" for "Hey Luminaropolis"); carries the heard words.
-    case otherName(String)
-    /// The name, or something else, without the phrase's first word.
-    case missingStart(String)
-    /// Nothing the model could make words of.
-    case nothing
-
-    /// Heard words ("HEY LUMINA ROPOLIS"), letters only ("DON'T" is "DONT").
-    static func words(_ pieces: [String]) -> [String] {
-        pieces.joined().split(separator: "▁").map { String($0.filter(\.isLetter)) }.filter { !$0.isEmpty }
+/// Voice tuning learns how this user says the wake phrase. A recording counts as a take when it is a plausible
+/// wake utterance and sounds like the user's other takes; it is never compared with the spelling, because the
+/// user's own way of saying the name is the one the listener has to catch.
+public enum Takes {
+    /// Why a recording can't be a take, described as the recording (never as a wrong name).
+    public enum Problem: Equatable, Sendable {
+        /// The model made no words of it, and it was quiet.
+        case quiet
+        /// The model made no words of it.
+        case nothing
+        /// Longer than a wake phrase: a sentence, or the phrase with more after it.
+        case long
     }
 
-    /// Spelling-of-sound normalization so vowels can count: "TRAY", "TRAY" and "TRAI" all become "TRA" while
-    /// "TROY" becomes "TROI"; doubled letters collapse ("JEFF" is "JEF"); TH is T (accents that stop it: "THREE").
-    static func sound(_ word: String) -> String {
-        var s = word.uppercased()
+    public static func problem(_ u: Utterance, phrase: String) -> Problem? {
+        guard sound(u.heard).count >= 2 else { return u.peak < -30 ? .quiet : .nothing }
+        let words = phrase.split(whereSeparator: { $0.isWhitespace }).count
+        if u.duration > 4 || Self.words(u.heard) > max(4, words + 2) { return .long }
+        return nil
+    }
+
+    /// The takes that agree: the largest group similar to one centre take (the earliest on ties), in order.
+    /// A stray recording (a cough the model made a word of, "Hey John" in the middle) stays out of it.
+    public static func agreeing(_ takes: [[String]]) -> [Int] {
+        let sounds = takes.map(sound)
+        var best: [Int] = []
+        for centre in sounds {
+            let group = sounds.indices.filter { similarity(centre, sounds[$0]) >= bar }
+            if group.count > best.count { best = group }
+        }
+        return best
+    }
+
+    /// Whether a take's tokens are specific enough to become a keyword whatever else is spotted: a long reading
+    /// ("HALUMINAROPOLIS") is; a short one ("HADOT") sits next to other names and is learned only when it repeats
+    /// (`repeated`) and the listener would miss the take without it.
+    static func specific(_ take: [String]) -> Bool { take.count >= 2 && sound(take).count >= 8 }
+
+    /// Whether another of `takes` (which include `take`) sounds the same, up to one small slip: the user's way of
+    /// saying it, not how the model misheard one take. "HEY DRAY" once among "HEY TRAY"s would answer "Hey Dre"
+    /// ("HADRA" is 0.9 from "HATRA").
+    static func repeated(_ take: [String], among takes: [[String]]) -> Bool {
+        let s = sound(take)
+        return take.count >= 2 && takes.filter { similarity(s, sound($0)) > 0.9 }.count >= 2
+    }
+
+    /// Two takes sound alike at this similarity. Takes of one phrase by one speaker, slow and rushed, score
+    /// 0.7 and up ("HATRA", "HADRA", "PATRE"); the name alone ("TRA") scores 0.6, "Hey John" 0.4.
+    static let bar = 0.65
+
+    static func words(_ pieces: [String]) -> Int {
+        pieces.joined().split(separator: "▁").filter { $0.contains(where: \.isLetter) }.count
+    }
+
+    /// The heard letters with spelling-of-sound normalization and the word breaks removed, since the model
+    /// moves them when a phrase is rushed: "HEY TRAY" and "HA T RE Y" are both "HATRA", "HEY DRAY" is "HADRA".
+    /// Doubled letters collapse and TH is T ("PAY THREE" is "PATRE").
+    static func sound(_ pieces: [String]) -> String {
+        var s = String(pieces.joined().filter(\.isLetter)).uppercased()
         for (from, to) in [("EIGH", "A"), ("IGH", "I"), ("PH", "F"), ("TH", "T"), ("CK", "K"), ("GH", ""), ("AY", "A"), ("EY", "A"),
                            ("EI", "A"), ("AI", "A"), ("EE", "E"), ("EA", "E"), ("IE", "E"), ("OY", "OI"), ("OO", "U"),
                            ("OU", "U"), ("OW", "O"), ("AU", "O"), ("AW", "O")] {
@@ -75,49 +114,10 @@ public enum Hearing: Equatable, Sendable {
         return out
     }
 
-    /// Compares what was heard with the phrase, using a sound-alike edit distance on the letters after the
-    /// first word. The bar is stricter for short names, where one sound changes the name ("Ray" for "Tray"),
-    /// and looser for long rare names, which the model spells loosely ("Lumina Ropolis").
-    public static func judge(heard pieces: [String], phrase: String) -> Hearing { match(heard: pieces, phrase: phrase).hearing }
-
-    /// Whether calibration may learn this sample's tokens as a keyword. For a short name (bar 0.7) the match must be
-    /// clear and start with the same sound: "HEY DONT" (0.75) for "hey dot" would teach a sequence that fires on
-    /// "hey don", and "HEY DRAY" for "hey tray" one that fires on "hey dre". Long names are learned at the bar.
-    static func learnable(heard pieces: [String], phrase: String) -> Bool {
-        let m = match(heard: pieces, phrase: phrase)
-        guard m.hearing == .phrase else { return false }
-        return m.bar < 0.7 || (m.similarity >= 0.76 && m.name.first == m.target.first)
-    }
-
-    private static func match(heard pieces: [String], phrase: String)
-        -> (hearing: Hearing, similarity: Double, bar: Double, name: String, target: String) {
-        let target = phrase.uppercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        let heard = words(pieces)
-        guard let first = target.first, !heard.isEmpty else { return (.nothing, 0, 1, "", "") }
-        let rest = target.dropFirst().joined()
-        let text = heard.joined(separator: " ")
-        guard !rest.isEmpty else {
-            let score = similarity(sound(heard.joined()), sound(first))
-            return (score >= 0.7 ? .phrase : .missingStart(text), score, 0.7, "", "")
-        }
-        // The start may be its own word ("HEY TRAY") or merged into the name ("HAYDRAY").
-        var name: String?
-        if heard.count >= 2, similarity(heard[0], first) >= 0.5 { name = heard.dropFirst().joined() }
-        else {
-            let joined = heard.joined()
-            if joined.count > first.count, similarity(String(joined.prefix(first.count)), first) >= 0.5 { name = String(joined.dropFirst(first.count)) }
-        }
-        guard let name else { return (.missingStart(text), 0, 1, "", "") }
-        let want = sound(rest)
-        let bar = min(0.7, max(0.5, 0.8 - 0.02 * Double(want.count)))
-        let heardName = sound(name), score = similarity(heardName, want)
-        return (score >= bar ? .phrase : .otherName(text), score, bar, heardName, want)
-    }
-
     /// 1 minus a weighted edit distance over the longer length. Vowels, and voiced/unvoiced pairs such as
     /// D and T, cost half a substitution (after `sound`, so a different vowel sound still costs).
     static func similarity(_ a: String, _ b: String) -> Double {
-        let x = Array(a.uppercased()), y = Array(b.uppercased())
+        let x = Array(a), y = Array(b)
         guard !x.isEmpty || !y.isEmpty else { return 1 }
         var row = Array(0...y.count).map(Double.init)
         for i in 1...max(1, x.count) where !x.isEmpty {

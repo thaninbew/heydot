@@ -237,16 +237,20 @@ plain Design your dot button there and on the last step (and the popover's palet
 Nothing listens until **Start**. Then "Say 'Hey <Name>' four times" with rings around the tile that follow the
 microphone level, a Listening label and four slots. `UtteranceSegmenter` (energy VAD: 60 ms to open, 500 ms of
 quiet to close, 300 ms pre-roll) cuts each utterance, and the keyword model, run as a plain recognizer only while
-tuning (`PhraseDecoder`), says what it heard. A slot ticks only when `Hearing.judge` finds the phrase (a sound-alike
-edit distance on the name, stricter for short names); otherwise a truthful hint says "That sounded like 'Hey John',
-a different name", "without the start" or "Didn't catch that". Tapping a ticked slot or chip retries that sample,
+tuning (`PhraseDecoder`), says what it heard. Tuning learns the user's own way of saying the phrase and never
+compares a take with the spelling: a plausible recording (heard words, at most a few more words than the phrase,
+under 4 s) is a take, and a slot ticks for each take that sounds like the others (`Takes.agreeing`, a sound-alike
+edit distance between takes with word breaks removed). Hints describe the recording: "too quiet", "Didn't catch
+anything", "longer than a wake phrase", or "sounded different from your others". Tapping a ticked slot retries that take,
 and the **Start over** pill clears every sample and listens again. No audio buffer for 3 s, or only digital silence (below -100 dBFS), stops with "No sound is coming
 from <mic>", **Try again** and the microphone menu, and logs `tuning: no audio from the built-in microphone (...)`.
 Real audio with no speech for 10 s is only a hint. The microphone menu sets HeyDot's own microphone (the macOS
-default input is left alone). Then "Now say something else": the start with a different name ("Hey John", or "Hey Sam" for a John), the name
-alone and "Hey there". **Continue** runs `Enroller.calibrate` once three wake phrases are heard: it stores the token
-sequences the model heard in the user's samples (`WakeSettings.learned`; a rare name may be heard differently from its spelling) and puts the threshold between the
-strongest recorded negative and the weakest sample, with a margin, so a recorded confusable is never answered.
+default input is left alone). There is no "say something else" step: recorded confusables never changed a tuned
+setting in the accuracy eval. **Continue** runs `Enroller.calibrate` once three takes agree: it stores, as
+`WakeSettings.learned`, the token sequences the model heard in those takes that are long enough to be specific, or
+that the user repeats and the listener would otherwise miss, and leans the threshold below the weakest take. Every
+keyword set, standard or tuned, spots the phrase as the model writes it (`Spotter.written`: "Trey" as `▁TRA Y`). See
+[tuning accuracy](tuning-accuracy.md).
 The listener spots the learned sequences beside the spelled phrase at no extra idle cost. The live listener is paused
 while tuning so a "Hey <Name>" can't start a real call. The privacy note and the listener readout are in
 Settings > Privacy.

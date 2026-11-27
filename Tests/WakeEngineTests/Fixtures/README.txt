@@ -6,9 +6,11 @@ Python reference: sentencepiece 0.2.2 and sherpa-onnx 1.13.8, KeywordDetector de
 Run PYTHONPATH=. .venv/bin/python apps/HeyDot/Scripts/check-parity.py from the repository root.
 Added 2026-11-15 for the Hey John regression (same command, rate 170 unless named): hey-luminaropolis-Daniel-{150,165,170,195},
   hey-john-{Daniel,Samantha}, hey-jeff-Daniel, luminaropolis-Daniel.
-WAV payloads total < 600 KB. No microphone, network, or OS speech synthesis used in tests.
+WAV payloads total < 650 KB. No microphone, network, or OS speech synthesis used in tests.
 
 The Tray and Luminaropolis fixtures were regenerated from the neutral example phrases on 2026-11-17 with the command above.
 The rare-name regression enrolls at 150, 165 and 195 words/minute and holds out 170; the public corpus uses distinct enrollment and held-out utterances without changing the matcher or assertions.
 The rare-spelling test uses Lumynaropolis as the target spelling for the spoken synthetic Luminaropolis to preserve coverage of learned tokens differing from spelled tokens.
 hey-dot-Daniel-320.wav uses the same command at 320 words/minute to test a short tuning attempt at the start of capture.
+hey-trey-Karen-340.wav and hey-trey-Daniel-300.wav (2026-11-27) use the same command at 340 and 300 words/minute: rushed "hey trey" with no
+  pause after "hey", which standard settings missed while they listened only for the spelled `▁T RE Y`.

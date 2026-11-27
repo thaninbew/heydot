@@ -227,34 +227,36 @@ public final class Enroller: WakeEnrolling {
             }
         } onCancel: { recording.finish(.failure(CancellationError())) }
     }
-    /// Learns the token sequences the model hears in the positives (only those it heard as the phrase), then
-    /// measures each clip's confidence (the highest threshold at which the keywords still fire) and puts the
-    /// threshold between the strongest negative and the weakest positive, leaning low because live speech
-    /// scores below enrollment clips. A recorded negative is never answered: when the two overlap, the
-    /// threshold goes above the negative and the missed positives are reported.
+    /// Learns the token sequences the model hears in the user's takes that agree: every specific (long) reading, and
+    /// a short one when it is how this user says it and the listener would miss that take without it
+    /// (`Takes.specific`, `Takes.repeated`). Then it measures each clip's confidence (the highest threshold at which
+    /// the keywords still fire) and puts the threshold between the strongest negative and the weakest take, leaning
+    /// low because live speech scores below enrollment clips. A recorded negative is never answered: when
+    /// the two overlap, the threshold goes above the negative and the missed positives are reported.
     public func calibrate(phrase: String, positives: [Clip], negatives: [Clip]) async throws -> Calibration {
         let task = Task.detached(priority: .userInitiated) {
             guard !positives.isEmpty else { throw WakeEngineError.engine("Record at least one positive clip") }
             let directory = try ModelFiles.locate()
             let tokenizer = try KeywordTokenizer(modelDirectory: directory)
-            var learned: [String] = []
-            do {
-                let decoder = try PhraseDecoder(directory: directory)
-                for clip in positives {
-                    try Task.checkCancellation()
-                    let pieces = decoder.pieces(clip).filter(tokenizer.knows)
-                    guard pieces.count >= 2, Hearing.learnable(heard: pieces, phrase: phrase) else { continue }
-                    let line = pieces.joined(separator: " ")
-                    if !learned.contains(line) { learned.append(line) }
-                }
-            }
+            // One model at a time: the decoder is released before the probe spotter loads.
+            let heard = try { let decoder = try PhraseDecoder(directory: directory); return positives.map { decoder.pieces($0).filter(tokenizer.knows) } }()
             let defaults = WakeSettings()
-            var settings = WakeSettings(phrase: phrase, spellings: Self.spellings(phrase), score: defaults.score,
-                                        threshold: defaults.threshold, learned: learned)
-            let keywords = try Spotter.keywords(settings, tokenizer: tokenizer)
+            var settings = WakeSettings(phrase: phrase, score: defaults.score, threshold: defaults.threshold)
             // A throwaway base keyword: sherpa-onnx appends the spotter's own keywords to every probe stream.
             let probe = try Spotter(keywords: [try tokenizer.pieces(for: "zebra quartz xylophone")], score: 1,
                                     threshold: 0.99, directory: directory)
+            let agreeing = Takes.agreeing(heard)
+            for i in agreeing {
+                try Task.checkCancellation()
+                let line = heard[i].joined(separator: " ")
+                guard !settings.learned.contains(line) else { continue }
+                if Takes.specific(heard[i]) { settings.learned.append(line); continue }
+                guard Takes.repeated(heard[i], among: agreeing.map { heard[$0] }),
+                      !probe.fires(positives[i], keywords: try Spotter.keywords(settings, tokenizer: tokenizer),
+                                   score: settings.score, threshold: defaults.threshold) else { continue }
+                settings.learned.append(line)
+            }
+            let keywords = try Spotter.keywords(settings, tokenizer: tokenizer)
             try Task.checkCancellation()
             let (weakest, firing) = probe.weakest(positives, keywords: keywords, score: settings.score)
             try Task.checkCancellation()
@@ -277,29 +279,5 @@ public final class Enroller: WakeEnrolling {
         guard let weakest else { return max(WakeSettings().threshold, worst + margin) }
         guard weakest >= worst + 2 * margin else { return min(1, worst + margin) }
         return min(weakest, max(0.05, worst + margin, worst + 0.4 * (weakest - worst)))
-    }
-    static func spellings(_ phrase: String) -> [String] {
-        var words = phrase.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        guard let last = words.popLast() else { return [] }
-        let prefix = words.isEmpty ? "" : words.joined(separator: " ") + " "
-        var alternatives: [String] = []
-        for group in [["ey", "ay", "ei"], ["ie", "y", "ee"], ["ph", "f"], ["c", "k"]] {
-            for source in group where last.hasSuffix(source) {
-                for target in group where target != source {
-                    let candidate = prefix + last.dropLast(source.count) + target
-                    if !alternatives.contains(candidate), alternatives.count < 3 { alternatives.append(candidate) }
-                }
-            }
-        }
-        if alternatives.count < 3 {
-            let letters = Array(last)
-            for i in letters.indices.dropFirst() where letters[i] == letters[i - 1] {
-                var shorter = letters; shorter.remove(at: i)
-                let candidate = prefix + String(shorter)
-                if !alternatives.contains(candidate) { alternatives.append(candidate) }
-                if alternatives.count == 3 { break }
-            }
-        }
-        return alternatives
     }
 }

@@ -78,12 +78,12 @@ public struct UtteranceSegmenter: Sendable {
 
 public struct Utterance: Sendable {
     public let clip: Clip
-    /// What the model heard in this utterance, judged against the wake phrase (`Hearing.judge`).
-    public let hearing: Hearing
-    public init(clip: Clip, hearing: Hearing) { self.clip = clip; self.hearing = hearing }
-    /// The wake phrase was heard.
-    public var matched: Bool { hearing == .phrase }
+    /// The model's tokens for this utterance (`PhraseDecoder`), word starts as `▁`.
+    public let heard: [String]
+    public init(clip: Clip, heard: [String]) { self.clip = clip; self.heard = heard }
     public var duration: Double { Double(clip.count) / Double(UtteranceSegmenter.rate) }
+    /// The loudest sample, in dBFS.
+    public var peak: Float { 20 * log10(max(clip.reduce(0) { max($0, abs($1)) }, 0.00000001)) }
 }
 
 private final class TuningSession: @unchecked Sendable {
@@ -95,7 +95,7 @@ private final class TuningSession: @unchecked Sendable {
 }
 
 /// Continuous listening for voice tuning: a level for the waveform about 20 times a second, and each
-/// utterance (segmented by `UtteranceSegmenter`) with what the model heard in it, judged against the phrase.
+/// utterance (segmented by `UtteranceSegmenter`) with what the model heard in it.
 /// Clips stay in memory for calibration; nothing is written or sent anywhere.
 @MainActor public final class TuningListener {
     public private(set) var isListening = false
@@ -115,7 +115,7 @@ private final class TuningSession: @unchecked Sendable {
         try capture.start { [weak self, session] samples in
             session.elapsed += Double(samples.count) / 16000
             let clips = session.segmenter.feed(samples)
-            let utterances = clips.map { Utterance(clip: $0, hearing: Hearing.judge(heard: session.decoder.pieces($0), phrase: phrase)) }
+            let utterances = clips.map { Utterance(clip: $0, heard: session.decoder.pieces($0)) }
             let meter = session.elapsed - session.lastMeter >= 0.05
             if meter { session.lastMeter = session.elapsed }
             let level = 20 * log10(max(samples.map { abs($0) }.max() ?? 0, 0.00000001))

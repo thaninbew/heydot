@@ -5,15 +5,49 @@ import AVFoundation
 /// Queue-confined native spotter. Owns all native handles; stream resets match the Python detector.
 final class Spotter {
     let handle: OpaquePointer
-    /// The token sequences spotted: the spelled phrase and spellings, then the learned sequences the model
-    /// knows. Duplicates and sequences that are a prefix of another are dropped (a prefix would fire first).
+    /// The token sequences spotted: the phrase as the model writes it, the stored spellings, then the learned
+    /// sequences the model knows. Duplicates and sequences that are a prefix of another are dropped (a prefix
+    /// would fire first).
     static func keywords(_ settings: WakeSettings, tokenizer: KeywordTokenizer) throws -> [[String]] {
-        var all = try ([settings.phrase] + settings.spellings).map { try tokenizer.pieces(for: $0) }
+        var all = [try written(settings.phrase, tokenizer: tokenizer)] + (try settings.spellings.map { try tokenizer.pieces(for: $0) })
         all += settings.learned.map { $0.split(separator: " ").map(String.init) }
             .filter { $0.count >= 2 && $0.allSatisfy(tokenizer.knows) }
         var unique: [[String]] = []
         for k in all where !unique.contains(k) { unique.append(k) }
         return unique.filter { k in !unique.contains { $0.count > k.count && Array($0.prefix(k.count)) == k } }
+    }
+    /// The phrase as the model would write it: of the typed spelling and its sound-alikes, the one the tokenizer finds
+    /// most likely (the typed one on a tie). The model writes a sound the common way (it hears "Trey" as `▁TRA Y`) and
+    /// the spotter fires only on an exact token path: a careful "Trey" after a pause can still be pulled onto the rare
+    /// written path `▁T RE Y`, a rushed one cannot.
+    static func written(_ phrase: String, tokenizer: KeywordTokenizer) throws -> [String] {
+        let candidates = try ([phrase] + soundAlikes(phrase)).map { try tokenizer.pieces(for: $0) }
+        return candidates.dropFirst().reduce(candidates[0]) { tokenizer.likelihood($1) > tokenizer.likelihood($0) ? $1 : $0 }
+    }
+    /// Other spellings of the name's ending that sound the same ("hey trey": "hey tray", "hey trei").
+    static func soundAlikes(_ phrase: String) -> [String] {
+        var words = phrase.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard let last = words.popLast() else { return [] }
+        let prefix = words.isEmpty ? "" : words.joined(separator: " ") + " "
+        var alternatives: [String] = []
+        for group in [["ey", "ay", "ei"], ["ie", "y", "ee"], ["ph", "f"], ["c", "k"]] {
+            for source in group where last.hasSuffix(source) {
+                for target in group where target != source {
+                    let candidate = prefix + last.dropLast(source.count) + target
+                    if !alternatives.contains(candidate), alternatives.count < 3 { alternatives.append(candidate) }
+                }
+            }
+        }
+        if alternatives.count < 3 {
+            let letters = Array(last)
+            for i in letters.indices.dropFirst() where letters[i] == letters[i - 1] {
+                var shorter = letters; shorter.remove(at: i)
+                let candidate = prefix + String(shorter)
+                if !alternatives.contains(candidate) { alternatives.append(candidate) }
+                if alternatives.count == 3 { break }
+            }
+        }
+        return alternatives
     }
     convenience init(settings: WakeSettings, directory: URL) throws {
         let tokenizer = try KeywordTokenizer(modelDirectory: directory)

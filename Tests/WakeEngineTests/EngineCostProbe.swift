@@ -37,10 +37,10 @@ import Testing
     while active.count < 120 * 16000 { active += speech[active.count / 32000 % speech.count] + noise(16000, 0.002) }
     active = Array(active.prefix(120 * 16000))
     let configs: [(String, WakeSettings)] = [
-        ("standard hey tray", WakeSettings(phrase: "hey tray", spellings: Enroller.spellings("hey tray"))),
-        ("tuned hey tray", WakeSettings(phrase: "hey tray", spellings: Enroller.spellings("hey tray"), threshold: 0.12,
+        ("standard hey tray", WakeSettings(phrase: "hey tray")),
+        ("tuned hey tray", WakeSettings(phrase: "hey tray", threshold: 0.12,
                                         learned: ["▁HE Y ▁TRA Y", "▁HE Y ▁DR A Y", "▁HA Y D RA Y"])),
-        ("tuned hey luminaropolis", WakeSettings(phrase: "hey luminaropolis", spellings: Enroller.spellings("hey luminaropolis"), threshold: 0.17,
+        ("tuned hey luminaropolis", WakeSettings(phrase: "hey luminaropolis", threshold: 0.17,
                                                   learned: ["▁HE Y LU M IN AR A PO LI S", "▁HE Y ▁LO OM ▁IN ▁A RA P OL US", "▁HE Y UM ▁IN ▁A RA P OL US"])),
     ]
     // One configuration per process gives a clean memory figure: HEYDOT_ENGINE_CONFIG=0, 1 or 2.

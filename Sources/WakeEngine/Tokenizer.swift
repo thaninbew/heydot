@@ -24,6 +24,8 @@ public struct KeywordTokenizer: Sendable {
     }
     /// Whether the model has this piece (validates stored learned sequences before they reach the spotter).
     func knows(_ piece: String) -> Bool { scores[piece] != nil }
+    /// The unigram log probability of a piece sequence: how commonly the model writes it.
+    func likelihood(_ pieces: [String]) -> Float { pieces.reduce(0) { $0 + (scores[$1] ?? -.infinity) } }
     public func pieces(for phrase: String) throws -> [String] {
         guard phrase.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) || (65...90).contains($0.value) || (97...122).contains($0.value) }) else {
             throw WakeEngineError.invalidPhrase(phrase)
