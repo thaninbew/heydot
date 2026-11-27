@@ -200,7 +200,7 @@ private func readyModel(home: URL, settings: AppSettings? = nil) -> (AppModel, F
     func endCall() { inCall = false }
     func warm(dotURL: String?) {}
     func pageState() async -> WebPageState { WebPageState(signedIn: nil) }
-    func showSignIn(onClose: @escaping () -> Void) {}
+    func showChatGPT(pickingDot: Bool, onClose: @escaping (DotTab?) -> Void) {}
     func signOut() async {}
 }
 

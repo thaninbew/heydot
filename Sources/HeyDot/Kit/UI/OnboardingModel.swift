@@ -487,7 +487,18 @@ final class OnboardingModel: ObservableObject {
 
     // MARK: Built-in browser
 
-    func signIn() { app.showSignIn() }
+    func signIn() { openChatGPT(pickingDot: false) }
+
+    func openChatGPT(pickingDot: Bool) {
+        app.web.showChatGPT(pickingDot: pickingDot) { [weak self] selected in
+            guard let self else { return }
+            if let selected {
+                if !webDots.contains(where: { $0.url == selected.url }) { webDots.append(selected) }
+                pick(selected)
+            }
+            Task { await self.readWeb() }
+        }
+    }
 
     func startWatchingWeb() {
         stopWatchingWeb()
@@ -507,7 +518,7 @@ final class OnboardingModel: ObservableObject {
         if let signedIn = state.signedIn { webSignedIn = signedIn }
         webChallenge = state.challenge
         for dot in state.dots where !webDots.contains(where: { $0.url == dot.url }) { webDots.append(dot) }
-        if urlDraft.isEmpty, let first = webDots.first { urlDraft = first.url }
+        if urlDraft.isEmpty, webDots.count == 1, let first = webDots.first { urlDraft = first.url }
     }
 
     // MARK: Pick dot
