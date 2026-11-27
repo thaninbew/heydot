@@ -54,9 +54,12 @@ Prefer not to run a downloaded build? [Build it yourself](#build-from-source) in
 
 ## How it works
 
-1. **Listening.** HeyDot captures 16 kHz audio from one chosen microphone and runs it through an on-device [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) keyword spotter tuned to your phrase. HeyDot processes wake-word audio in memory. It never saves or uploads that audio.
-2. **Waking.** When it hears your phrase, it opens your dot's page in a built-in, hidden ChatGPT web view (signed in once, by you) and presses its call button for you.
+1. **Listening.** HeyDot captures 16 kHz audio from one chosen microphone and runs it through an on-device [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) keyword spotter tuned to your phrase. It's light: listening uses about 2% of one CPU core and the keyword model about 45 MB of memory, measured on an M1 Pro ([how](docs/tuning-accuracy.md#resources)). HeyDot processes wake-word audio in memory. It never saves or uploads that audio.
+2. **Waking.** When it hears your phrase, it opens your dot's page in a built-in, hidden ChatGPT web view and presses its call button for you, the same button you'd click yourself. You sign in to ChatGPT in that web view once, during setup, and the sign-in stays there. The page is unloaded again after 30 idle seconds, so it isn't running in the background.
 3. **Talking.** From there it's a normal ChatGPT voice call: your call audio goes to ChatGPT, just as it does in the ChatGPT app. Hang up or mute from the menu bar.
+4. **Tuning.** During setup you say the phrase four times, your way. HeyDot runs the same speech model over those takes as a plain recognizer and saves the sound sequences it actually heard as extra wake phrases, so it learns how you say your dot's name instead of how it's spelled. Takes only have to sound like each other, not like a dictionary. Details in [docs/tuning-accuracy.md](docs/tuning-accuracy.md).
+
+You don't have to talk to it, either: the menu bar popover has a **Call** button, so HeyDot also works as a one-click dial for your dot without switching to the ChatGPT window.
 
 **What leaves your Mac:** your normal ChatGPT session (the web view talks to ChatGPT and whichever sign-in provider you use), and update checks against this GitHub repo (once a day if you allow automatic checks, or when you click **Check for Updates…** in Settings). An update check sends only the request itself, with HeyDot's version in it. HeyDot has no servers, no analytics and no telemetry. Details in [SECURITY.md](SECURITY.md).
 
